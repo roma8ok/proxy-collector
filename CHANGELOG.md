@@ -1,3 +1,7 @@
+### 0.0.4 - 2021.07.15
+
+- added redis and proxy source cache
+
 ### 0.0.3 - 2021.07.15
 
 - added microservice to process body from duckduckgo search response and send found urls to queue

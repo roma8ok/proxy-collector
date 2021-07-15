@@ -35,14 +35,14 @@ func sendSearchBodyFromDDGToQueue(conn *amqp.Connection, searchQuery, proxyURL, 
 	return nil
 }
 
-func processSearchBodyFromDDG(conn *amqp.Connection) error {
-	chSource, err := conn.Channel()
+func processSearchBodyFromDDG(rabbitConn *amqp.Connection, rdb *redisDB) error {
+	chSource, err := rabbitConn.Channel()
 	if err != nil {
 		return err
 	}
 	defer chSource.Close()
 
-	chDest, err := conn.Channel()
+	chDest, err := rabbitConn.Channel()
 	if err != nil {
 		return err
 	}
@@ -51,8 +51,15 @@ func processSearchBodyFromDDG(conn *amqp.Connection) error {
 	handler := func(in []byte) error {
 		urls := findSiteURLsFromDDG(string(in))
 		for _, u := range urls {
-			if err := publish(chDest, queueProxySources, []byte(u)); err != nil {
+			changeType, err := rdb.set(u)
+			if err != nil {
 				return err
+			}
+			switch changeType {
+			case redisChangeAdd, redisChangeUpdate:
+				if err := publish(chDest, queueProxySources, []byte(u)); err != nil {
+					return err
+				}
 			}
 		}
 		return nil
