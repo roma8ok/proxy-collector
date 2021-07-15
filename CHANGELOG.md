@@ -1,3 +1,7 @@
+### 0.0.3 - 2021.07.15
+
+- added microservice to process body from duckduckgo search response and send found urls to queue
+
 ### 0.0.2 - 2021.07.14
 
 - queue added

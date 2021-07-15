@@ -4,6 +4,8 @@ import (
 	"crypto/tls"
 	"net/http"
 	"net/url"
+	"regexp"
+	"strings"
 	"time"
 )
 
@@ -50,4 +52,17 @@ func sendSearchRequest(searchURL, proxyURL, userAgent string) (*http.Response, e
 	}
 
 	return resp, nil
+}
+
+func findSiteURLsFromDDG(htmlBody string) (urls []string) {
+	reABody := regexp.MustCompile(`<a class="result__url" href=".+?">`)
+	linkBodies := reABody.FindAllString(htmlBody, -1)
+
+	for _, linkBody := range linkBodies {
+		href := strings.TrimPrefix(linkBody, `<a class="result__url" href="`)
+		href = strings.TrimSuffix(href, `">`)
+		urls = append(urls, href)
+	}
+
+	return uniqueArrayOfValues(urls)
 }

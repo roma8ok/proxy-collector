@@ -12,6 +12,7 @@ const (
 	proxyURL                 = ""
 	userAgent                = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36"
 	queueSearchBodiesFromDDG = "search_bodies_from_DDG"
+	queueProxySources        = "proxy_sources"
 )
 
 func main() {
@@ -29,6 +30,11 @@ func main() {
 	}(conn)
 
 	if err := sendSearchBodyFromDDGToQueue(conn, searchQuery, proxyURL, userAgent); err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	if err := processSearchBodyFromDDG(conn); err != nil {
 		fmt.Println(err)
 		return
 	}
