@@ -1,6 +1,11 @@
+### 0.0.7 - in progress
+
+- added find proxies from html table
+
 ### 0.0.6 - 2021.07.16
 
 - added findProxiesFromHTML
+- added microservice to find proxies from html and send to queue
 
 ### 0.0.5 - 2021.07.16
 

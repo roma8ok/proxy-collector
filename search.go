@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/tls"
+	"fmt"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -70,8 +71,29 @@ func findSiteURLsFromDDG(htmlBody string) (urls []string) {
 }
 
 func findProxiesFromHTML(htmlBody string) []string {
-	re := regexp.MustCompile(`\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b:\d{2,5}`)
-	proxies := re.FindAllString(htmlBody, -1)
+	wholeProxies := findWholeProxies(htmlBody)
+	tableProxy := findProxiesFromTable(htmlBody)
+	proxies := append(wholeProxies, tableProxy...)
 
 	return uniqueArrayOfValues(proxies)
+}
+
+func findWholeProxies(in string) []string {
+	re := regexp.MustCompile(`\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b:\d{2,5}`)
+	return re.FindAllString(in, -1)
+}
+
+func findProxiesFromTable(in string) (proxies []string) {
+	reTR := regexp.MustCompile(`<tr>.+?</tr>`)
+	trs := reTR.FindAllString(in, -1)
+
+	reTDs := regexp.MustCompile(`<td.*?>\b((?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))\b</td>.*?<td.*?>(\d{2,5})</td>`)
+	for _, tr := range trs {
+		tds := reTDs.FindStringSubmatch(tr)
+		if len(tds) == 3 {
+			proxies = append(proxies, fmt.Sprintf("%s:%s", tds[1], tds[2]))
+		}
+	}
+
+	return
 }
