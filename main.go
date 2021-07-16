@@ -10,9 +10,8 @@ import (
 )
 
 const (
-	searchQuery = "proxy list"
-	proxyURL    = ""
-	userAgent   = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36"
+	proxyURL  = ""
+	userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36"
 
 	requestTimeout = 5 * time.Second
 
@@ -51,10 +50,12 @@ func main() {
 
 	go func() {
 		for {
-			if err := sendSearchBodyFromDDGToQueue(rabbitConn, searchQuery, proxyURL, userAgent); err != nil {
-				panic(err)
+			for _, query := range []string{"proxy list", "proxy", "proxies", "прокси", "список прокси"} {
+				if err := sendSearchBodyFromDDGToQueue(rabbitConn, query, proxyURL, userAgent); err != nil {
+					panic(err)
+				}
+				time.Sleep(time.Minute)
 			}
-			time.Sleep(time.Minute)
 		}
 	}()
 
@@ -71,7 +72,7 @@ func main() {
 	}()
 
 	go func() {
-		if err := processSourceHTML(rabbitConn); err != nil {
+		if err := processSourceHTML(rabbitConn, rdb); err != nil {
 			panic(err)
 		}
 	}()

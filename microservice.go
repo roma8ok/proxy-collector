@@ -143,18 +143,24 @@ func sendHTMLFromProxySourceToQueue(rabbitConn *amqp.Connection) error {
 	return nil
 }
 
-func processSourceHTML(rabbitConn *amqp.Connection) error {
+func processSourceHTML(rabbitConn *amqp.Connection, rdb *redisDB) error {
 	chSource, err := rabbitConn.Channel()
 	if err != nil {
 		return err
 	}
 	defer chSource.Close()
 
-	chDest, err := rabbitConn.Channel()
+	chDestRawProxies, err := rabbitConn.Channel()
 	if err != nil {
 		return err
 	}
-	defer chDest.Close()
+	defer chDestRawProxies.Close()
+
+	chDestProxySources, err := rabbitConn.Channel()
+	if err != nil {
+		return err
+	}
+	defer chDestProxySources.Close()
 
 	handler := func(in []byte) error {
 		fmt.Println(time.Now().Format("2006-01-02T15:04:05"), "processSourceHTML - start")
@@ -165,10 +171,28 @@ func processSourceHTML(rabbitConn *amqp.Connection) error {
 
 		proxies := findProxiesFromHTML(string(in))
 		for _, proxy := range proxies {
-			if err := publish(chDest, queueRawProxies, []byte(proxy)); err != nil {
+			if err := publish(chDestRawProxies, queueRawProxies, []byte(proxy)); err != nil {
 				return err
 			}
 		}
+
+		urls := findURLsFromHTML(string(in))
+		for _, u := range urls {
+			if !possibleForProxySourceURL(u) {
+				continue
+			}
+
+			changeType, err := rdb.set(u)
+			if err != nil {
+				return err
+			}
+			switch changeType {
+			case redisChangeAdd, redisChangeUpdate:
+				if err := publish(chDestProxySources, queueProxySources, []byte(u)); err != nil {
+				}
+			}
+		}
+
 		return nil
 	}
 

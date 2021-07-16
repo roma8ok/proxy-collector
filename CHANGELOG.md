@@ -1,6 +1,7 @@
-### 0.0.7 - in progress
+### 0.0.7 - 2021.07.17
 
 - added find proxies from html table
+- find urls from html and add to queue
 
 ### 0.0.6 - 2021.07.16
 
