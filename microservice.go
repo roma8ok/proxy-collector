@@ -142,3 +142,39 @@ func sendHTMLFromProxySourceToQueue(rabbitConn *amqp.Connection) error {
 
 	return nil
 }
+
+func processSourceHTML(rabbitConn *amqp.Connection) error {
+	chSource, err := rabbitConn.Channel()
+	if err != nil {
+		return err
+	}
+	defer chSource.Close()
+
+	chDest, err := rabbitConn.Channel()
+	if err != nil {
+		return err
+	}
+	defer chDest.Close()
+
+	handler := func(in []byte) error {
+		fmt.Println(time.Now().Format("2006-01-02T15:04:05"), "processSourceHTML - start")
+		ts := time.Now()
+		defer func(ts time.Time) {
+			fmt.Println(time.Now().Format("2006-01-02T15:04:05"), "processSourceHTML end", time.Now().Sub(ts))
+		}(ts)
+
+		proxies := findProxiesFromHTML(string(in))
+		for _, proxy := range proxies {
+			if err := publish(chDest, queueRawProxies, []byte(proxy)); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	if err := consume(chSource, queueProxySourceHTML, handler); err != nil {
+		return err
+	}
+
+	return nil
+}

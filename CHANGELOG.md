@@ -1,4 +1,4 @@
-### 0.0.6 - in progress
+### 0.0.6 - 2021.07.16
 
 - added findProxiesFromHTML
 

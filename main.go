@@ -20,6 +20,7 @@ const (
 	queueSearchBodiesFromDDG = "search_bodies_from_DDG"
 	queueProxySources        = "proxy_sources"
 	queueProxySourceHTML     = "proxy_source_html"
+	queueRawProxies          = "raw_proxies"
 
 	redisURL        = "redis://localhost:6379"
 	redisExpiration = time.Hour * 24
@@ -39,7 +40,7 @@ func main() {
 			panic(err)
 		}
 	}(rabbitConn)
-	if err := initQueues(rabbitConn, []string{queueSearchBodiesFromDDG, queueProxySources, queueProxySourceHTML}); err != nil {
+	if err := initQueues(rabbitConn, []string{queueSearchBodiesFromDDG, queueProxySources, queueProxySourceHTML, queueRawProxies}); err != nil {
 		panic(err)
 	}
 
@@ -65,6 +66,12 @@ func main() {
 
 	go func() {
 		if err := sendHTMLFromProxySourceToQueue(rabbitConn); err != nil {
+			panic(err)
+		}
+	}()
+
+	go func() {
+		if err := processSourceHTML(rabbitConn); err != nil {
 			panic(err)
 		}
 	}()
