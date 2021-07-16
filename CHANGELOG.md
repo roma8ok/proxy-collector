@@ -1,3 +1,7 @@
+### 0.0.6 - in progress
+
+- added findProxiesFromHTML
+
 ### 0.0.5 - 2021.07.16
 
 - added microservice to get HTML from proxy source and send to queue

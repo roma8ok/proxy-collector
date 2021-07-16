@@ -68,3 +68,10 @@ func findSiteURLsFromDDG(htmlBody string) (urls []string) {
 
 	return uniqueArrayOfValues(urls)
 }
+
+func findProxiesFromHTML(htmlBody string) []string {
+	re := regexp.MustCompile(`\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b:\d{2,5}`)
+	proxies := re.FindAllString(htmlBody, -1)
+
+	return uniqueArrayOfValues(proxies)
+}
