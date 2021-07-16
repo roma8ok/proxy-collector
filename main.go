@@ -1,7 +1,9 @@
 package main
 
 import (
-	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/streadway/amqp"
@@ -12,41 +14,60 @@ const (
 	proxyURL    = ""
 	userAgent   = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36"
 
+	requestTimeout = 5 * time.Second
+
 	rabbitURL                = "amqp://admin:admin@localhost:5672/"
 	queueSearchBodiesFromDDG = "search_bodies_from_DDG"
 	queueProxySources        = "proxy_sources"
+	queueProxySourceHTML     = "proxy_source_html"
 
 	redisURL        = "redis://localhost:6379"
 	redisExpiration = time.Hour * 24
 )
 
 func main() {
+	exit := make(chan os.Signal, 1)
+	signal.Notify(exit, syscall.SIGINT, syscall.SIGTERM)
+
 	rabbitConn, err := amqp.Dial(rabbitURL)
 	if err != nil {
-		fmt.Println(err)
-		return
+		panic(err)
 	}
 	defer func(conn *amqp.Connection) {
 		err := conn.Close()
 		if err != nil {
-			fmt.Println(err)
-			return
+			panic(err)
 		}
 	}(rabbitConn)
+	if err := initQueues(rabbitConn, []string{queueSearchBodiesFromDDG, queueProxySources, queueProxySourceHTML}); err != nil {
+		panic(err)
+	}
 
 	rdb, err := newRedisDB(redisURL)
 	if err != nil {
-		fmt.Println(err)
-		return
+		panic(err)
 	}
 
-	if err := sendSearchBodyFromDDGToQueue(rabbitConn, searchQuery, proxyURL, userAgent); err != nil {
-		fmt.Println(err)
-		return
-	}
+	go func() {
+		for {
+			if err := sendSearchBodyFromDDGToQueue(rabbitConn, searchQuery, proxyURL, userAgent); err != nil {
+				panic(err)
+			}
+			time.Sleep(time.Minute)
+		}
+	}()
 
-	if err := processSearchBodyFromDDG(rabbitConn, rdb); err != nil {
-		fmt.Println(err)
-		return
-	}
+	go func() {
+		if err := processSearchBodyFromDDG(rabbitConn, rdb); err != nil {
+			panic(err)
+		}
+	}()
+
+	go func() {
+		if err := sendHTMLFromProxySourceToQueue(rabbitConn); err != nil {
+			panic(err)
+		}
+	}()
+
+	<-exit
 }

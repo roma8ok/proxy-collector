@@ -1,3 +1,9 @@
+### 0.0.5 - 2021.07.16
+
+- added microservice to get HTML from proxy source and send to queue
+- added simple logger
+- refactored sendRequest, publish
+
 ### 0.0.4 - 2021.07.15
 
 - added redis and proxy source cache

@@ -4,29 +4,38 @@ import (
 	"github.com/streadway/amqp"
 )
 
-func publish(ch *amqp.Channel, queueName string, body []byte) error {
-	q, err := ch.QueueDeclare(
-		queueName,
-		false,
-		false,
-		false,
-		false,
-		nil,
-	)
+func initQueues(conn *amqp.Connection, queues []string) error {
+	ch, err := conn.Channel()
 	if err != nil {
 		return err
 	}
+	defer ch.Close()
 
-	err = ch.Publish(
-		"",     // exchange
-		q.Name, // routing key
-		false,  // mandatory
-		false,  // immediate
+	for _, q := range queues {
+		if _, err := ch.QueueDeclare(
+			q,
+			false,
+			false,
+			false,
+			false,
+			nil,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func publish(ch *amqp.Channel, queueName string, body []byte) error {
+	if err := ch.Publish(
+		"",
+		queueName,
+		false,
+		false,
 		amqp.Publishing{
 			ContentType: "text/plain",
 			Body:        body,
-		})
-	if err != nil {
+		}); err != nil {
 		return err
 	}
 

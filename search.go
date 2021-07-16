@@ -6,7 +6,6 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
-	"time"
 )
 
 func makeDDGSearchURL(query string) string {
@@ -22,10 +21,12 @@ func makeDDGSearchURL(query string) string {
 	return u.String()
 }
 
-func sendSearchRequest(searchURL, proxyURL, userAgent string) (*http.Response, error) {
+func sendRequest(searchURL, proxyURL string, headers map[string]string) (*http.Response, error) {
 	tr := &http.Transport{
-		IdleConnTimeout: 5 * time.Second,
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		TLSClientConfig:       &tls.Config{InsecureSkipVerify: true},
+		IdleConnTimeout:       requestTimeout,
+		ResponseHeaderTimeout: requestTimeout,
+		ExpectContinueTimeout: requestTimeout,
 	}
 
 	if proxyURL != "" {
@@ -43,8 +44,9 @@ func sendSearchRequest(searchURL, proxyURL, userAgent string) (*http.Response, e
 		return nil, err
 	}
 
-	req.Header.Add("Content-Type", "text/html; charset=UTF-8")
-	req.Header.Add("User-Agent", userAgent)
+	for k, v := range headers {
+		req.Header.Add(k, v)
+	}
 
 	resp, err := client.Do(req)
 	if err != nil {
