@@ -47,3 +47,32 @@ func TestUniqueArrayOfValues_NonUnique(t *testing.T) {
 		}
 	}
 }
+
+func TestIsExist_NonExist(t *testing.T) {
+	testCases := [][]string{
+		{},
+		{"a", "b", "c"},
+		{"a", "a", "a"},
+	}
+	nonExist := "nonExist"
+
+	for _, testCase := range testCases {
+		if exist := isExist(nonExist, testCase); exist {
+			t.Errorf(`isExist(%s, %v) = %t, expected false`, nonExist, testCase, exist)
+		}
+	}
+}
+
+func TestIsExist_Exist(t *testing.T) {
+	testCases := [][]string{
+		{"a", "b", "c"},
+		{"a", "a", "a"},
+	}
+	exist := "a"
+
+	for _, testCase := range testCases {
+		if found := isExist(exist, testCase); !found {
+			t.Errorf(`isExist(%s, %v) = %t, expected true`, exist, testCase, found)
+		}
+	}
+}

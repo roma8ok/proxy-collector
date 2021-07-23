@@ -1,3 +1,7 @@
+### 0.0.8 - in progress
+
+- add flag to start microservices
+
 ### 0.0.7 - 2021.07.17
 
 - added find proxies from html table

@@ -13,6 +13,15 @@ func uniqueArrayOfValues(arr []string) (unique []string) {
 	return
 }
 
+func isExist(val string, arr []string) bool {
+	for _, v := range arr {
+		if v == val {
+			return true
+		}
+	}
+	return false
+}
+
 func possibleForProxySourceURL(u string) bool {
 	suffixes := []string{".css", ".ico", ".png", ".jpg", ".jpeg", ".webp", ".gif", ".js", ".ts", ".woff", ".woff2"}
 	for _, suffix := range suffixes {
