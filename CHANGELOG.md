@@ -1,6 +1,7 @@
-### 0.0.8 - in progress
+### 0.0.8 - 2021.07.23
 
-- add flag to start microservices
+- added flag to start microservices
+- renamed microservices to services
 
 ### 0.0.7 - 2021.07.17
 
