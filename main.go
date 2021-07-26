@@ -22,6 +22,9 @@ const (
 	queueProxySources        = "proxy_sources"
 	queueProxySourceHTML     = "proxy_source_html"
 	queueRawProxies          = "raw_proxies"
+	queueProcessedProxies    = "processed_proxies"
+
+	ipAPIURL = "https://api64.ipify.org"
 
 	redisURLForSites   = "redis://localhost:6379"
 	redisURLForProxies = "redis://localhost:6380"
@@ -31,11 +34,12 @@ const (
 	serviceProcessSearchBodyFromDDG       = "processSearchBodyFromDDG"
 	serviceSendHTMLFromProxySourceToQueue = "sendHTMLFromProxySourceToQueue"
 	serviceProcessSourceHTML              = "processSourceHTML"
+	serviceProcessRawProxy                = "processRawProxy"
 )
 
 func main() {
 	var sFlags arrayFlags
-	flag.Var(&sFlags, "service", fmt.Sprintf("Select one of more services for activate.\nAvailable: %s, %s, %s, %s.", serviceSendSearchBodyFromDDGToQueue, serviceProcessSearchBodyFromDDG, serviceSendHTMLFromProxySourceToQueue, serviceProcessSourceHTML))
+	flag.Var(&sFlags, "service", fmt.Sprintf("Select one of more services for activate.\nAvailable: %s, %s, %s, %s, %s.", serviceSendSearchBodyFromDDGToQueue, serviceProcessSearchBodyFromDDG, serviceSendHTMLFromProxySourceToQueue, serviceProcessSourceHTML, serviceProcessRawProxy))
 	flag.Parse()
 	if len(sFlags) == 0 {
 		panic("Select one of more services for activate (flag -service)")
@@ -51,7 +55,9 @@ func main() {
 			panic(err)
 		}
 	}(rabbitConn)
-	if err := initQueues(rabbitConn, []string{queueSearchBodiesFromDDG, queueProxySources, queueProxySourceHTML, queueRawProxies}); err != nil {
+
+	queues := []string{queueSearchBodiesFromDDG, queueProxySources, queueProxySourceHTML, queueRawProxies, queueProcessedProxies}
+	if err := initQueues(rabbitConn, queues); err != nil {
 		panic(err)
 	}
 
@@ -103,6 +109,15 @@ func main() {
 		fmt.Printf("Start worker for %s\n", serviceProcessSourceHTML)
 		go func() {
 			if err := processSourceHTML(rabbitConn, rdbForSites, rdbForProxies); err != nil {
+				panic(err)
+			}
+		}()
+	}
+
+	if isExist(serviceProcessRawProxy, sFlags) {
+		fmt.Printf("Start worker for %s\n", serviceProcessRawProxy)
+		go func() {
+			if err := processRawProxy(rabbitConn); err != nil {
 				panic(err)
 			}
 		}()

@@ -4,9 +4,16 @@ import (
 	"github.com/streadway/amqp"
 )
 
-type payload struct {
+type htmlPayload struct {
 	HTML    string `json:"html"`
 	FromURL string `json:"from_url"`
+}
+
+type proxyPayload struct {
+	URL       string `json:"url"`
+	Anonymous bool   `json:"anonymous"`
+	Type      string `json:"type"`
+	TS        string `json:"ts"`
 }
 
 func initQueues(conn *amqp.Connection, queues []string) error {

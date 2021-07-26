@@ -31,11 +31,11 @@ func sendRequest(searchURL, proxyURL string, headers map[string]string) (*http.R
 	}
 
 	if proxyURL != "" {
-		proxy, err := url.Parse(proxyURL)
+		p, err := url.Parse(proxyURL)
 		if err != nil {
 			return nil, err
 		}
-		tr.Proxy = http.ProxyURL(proxy)
+		tr.Proxy = http.ProxyURL(p)
 	}
 
 	client := &http.Client{Transport: tr}

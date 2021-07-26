@@ -1,3 +1,8 @@
+### 0.0.10 - 2021.07.26
+
+- added proxies checker
+- added service to process raw proxies
+
 ### 0.0.9 - 2021.07.26
 
 - added redis for collecting proxies
