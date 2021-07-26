@@ -4,6 +4,11 @@ import (
 	"github.com/streadway/amqp"
 )
 
+type payload struct {
+	HTML    string `json:"html"`
+	FromURL string `json:"from_url"`
+}
+
 func initQueues(conn *amqp.Connection, queues []string) error {
 	ch, err := conn.Channel()
 	if err != nil {

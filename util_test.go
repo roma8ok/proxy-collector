@@ -76,3 +76,21 @@ func TestIsExist_Exist(t *testing.T) {
 		}
 	}
 }
+
+func TestURLsHaveSameDomain_DifferentDomains(t *testing.T) {
+	u1 := "https://google.com"
+	u2 := "https://duckduckgo.com"
+
+	if same := urlsHaveSameDomain(u1, u2); same {
+		t.Errorf(`urlsHaveSameDomain(%s, %v) = %t, expected false`, u1, u2, same)
+	}
+}
+
+func TestURLsHaveSameDomain_SameDomains(t *testing.T) {
+	u1 := "https://google.com:56789/"
+	u2 := "http://google.com/hello?q=123"
+
+	if same := urlsHaveSameDomain(u1, u2); !same {
+		t.Errorf(`urlsHaveSameDomain(%s, %v) = %t, expected true`, u1, u2, same)
+	}
+}

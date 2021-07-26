@@ -1,3 +1,9 @@
+### 0.0.9 - 2021.07.26
+
+- added redis for collecting proxies
+- deleted consumer_timeout from rabbit config
+- send FromURL with html at some services
+
 ### 0.0.8 - 2021.07.23
 
 - added flag to start microservices

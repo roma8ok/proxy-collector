@@ -23,8 +23,9 @@ const (
 	queueProxySourceHTML     = "proxy_source_html"
 	queueRawProxies          = "raw_proxies"
 
-	redisURL        = "redis://localhost:6379"
-	redisExpiration = time.Hour * 24
+	redisURLForSites   = "redis://localhost:6379"
+	redisURLForProxies = "redis://localhost:6380"
+	redisExpiration    = time.Hour * 24
 
 	serviceSendSearchBodyFromDDGToQueue   = "sendSearchBodyFromDDGToQueue"
 	serviceProcessSearchBodyFromDDG       = "processSearchBodyFromDDG"
@@ -54,7 +55,11 @@ func main() {
 		panic(err)
 	}
 
-	rdb, err := newRedisDB(redisURL)
+	rdbForSites, err := newRedisDB(redisURLForSites)
+	if err != nil {
+		panic(err)
+	}
+	rdbForProxies, err := newRedisDB(redisURLForProxies)
 	if err != nil {
 		panic(err)
 	}
@@ -79,7 +84,7 @@ func main() {
 	if isExist(serviceProcessSearchBodyFromDDG, sFlags) {
 		fmt.Printf("Start worker for %s\n", serviceProcessSearchBodyFromDDG)
 		go func() {
-			if err := processSearchBodyFromDDG(rabbitConn, rdb); err != nil {
+			if err := processSearchBodyFromDDG(rabbitConn, rdbForSites); err != nil {
 				panic(err)
 			}
 		}()
@@ -97,7 +102,7 @@ func main() {
 	if isExist(serviceProcessSourceHTML, sFlags) {
 		fmt.Printf("Start worker for %s\n", serviceProcessSourceHTML)
 		go func() {
-			if err := processSourceHTML(rabbitConn, rdb); err != nil {
+			if err := processSourceHTML(rabbitConn, rdbForSites, rdbForProxies); err != nil {
 				panic(err)
 			}
 		}()

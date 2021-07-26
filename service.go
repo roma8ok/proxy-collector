@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -130,7 +131,16 @@ func sendHTMLFromProxySourceToQueue(rabbitConn *amqp.Connection) error {
 		if err != nil {
 			return err
 		}
-		if err := publish(chDest, queueProxySourceHTML, body); err != nil {
+		htmlPayload := payload{
+			HTML:    string(body),
+			FromURL: string(in),
+		}
+		htmlPayloadJSON, err := json.Marshal(htmlPayload)
+		if err != nil {
+			return err
+		}
+
+		if err := publish(chDest, queueProxySourceHTML, htmlPayloadJSON); err != nil {
 			return err
 		}
 		return nil
@@ -143,7 +153,7 @@ func sendHTMLFromProxySourceToQueue(rabbitConn *amqp.Connection) error {
 	return nil
 }
 
-func processSourceHTML(rabbitConn *amqp.Connection, rdb *redisDB) error {
+func processSourceHTML(rabbitConn *amqp.Connection, rdbForSites *redisDB, rdbForProxies *redisDB) error {
 	chSource, err := rabbitConn.Channel()
 	if err != nil {
 		return err
@@ -169,20 +179,34 @@ func processSourceHTML(rabbitConn *amqp.Connection, rdb *redisDB) error {
 			fmt.Println(time.Now().Format("2006-01-02T15:04:05"), "processSourceHTML end", time.Now().Sub(ts))
 		}(ts)
 
-		proxies := findProxiesFromHTML(string(in))
+		var htmlPayload payload
+		if err := json.Unmarshal(in, &htmlPayload); err != nil {
+			return err
+		}
+
+		proxies := findProxiesFromHTML(htmlPayload.HTML)
 		for _, proxy := range proxies {
-			if err := publish(chDestRawProxies, queueRawProxies, []byte(proxy)); err != nil {
+			changeType, err := rdbForProxies.set(proxy)
+			if err != nil {
 				return err
+			}
+			switch changeType {
+			case redisChangeAdd, redisChangeUpdate:
+				if err := publish(chDestRawProxies, queueRawProxies, []byte(proxy)); err != nil {
+				}
 			}
 		}
 
-		urls := findURLsFromHTML(string(in))
+		urls := findURLsFromHTML(htmlPayload.HTML)
 		for _, u := range urls {
+			if !urlsHaveSameDomain(htmlPayload.FromURL, u) {
+				continue
+			}
 			if !possibleForProxySourceURL(u) {
 				continue
 			}
 
-			changeType, err := rdb.set(u)
+			changeType, err := rdbForSites.set(u)
 			if err != nil {
 				return err
 			}
