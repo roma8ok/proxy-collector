@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -8,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/streadway/amqp"
 )
 
@@ -22,13 +24,14 @@ const (
 	queueProxySources        = "proxy_sources"
 	queueProxySourceHTML     = "proxy_source_html"
 	queueRawProxies          = "raw_proxies"
-	queueProcessedProxies    = "processed_proxies"
 
 	ipAPIURL = "https://api64.ipify.org"
 
 	redisURLForSites   = "redis://localhost:6379"
 	redisURLForProxies = "redis://localhost:6380"
 	redisExpiration    = time.Hour * 24
+
+	postgresURL = "postgres://admin:admin@localhost:5432/admin"
 
 	serviceSendSearchBodyFromDDGToQueue   = "sendSearchBodyFromDDGToQueue"
 	serviceProcessSearchBodyFromDDG       = "processSearchBodyFromDDG"
@@ -56,7 +59,7 @@ func main() {
 		}
 	}(rabbitConn)
 
-	queues := []string{queueSearchBodiesFromDDG, queueProxySources, queueProxySourceHTML, queueRawProxies, queueProcessedProxies}
+	queues := []string{queueSearchBodiesFromDDG, queueProxySources, queueProxySourceHTML, queueRawProxies}
 	if err := initQueues(rabbitConn, queues); err != nil {
 		panic(err)
 	}
@@ -69,6 +72,12 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+	postgresPool, err := pgxpool.Connect(context.Background(), postgresURL)
+	if err != nil {
+		return
+	}
+	defer postgresPool.Close()
 
 	exit := make(chan os.Signal, 1)
 	signal.Notify(exit, syscall.SIGINT, syscall.SIGTERM)
@@ -108,7 +117,7 @@ func main() {
 	if isExist(serviceProcessSourceHTML, sFlags) {
 		fmt.Printf("Start worker for %s\n", serviceProcessSourceHTML)
 		go func() {
-			if err := processSourceHTML(rabbitConn, rdbForSites, rdbForProxies); err != nil {
+			if err := processSourceHTML(rabbitConn, rdbForSites, rdbForProxies, postgresPool); err != nil {
 				panic(err)
 			}
 		}()
@@ -117,7 +126,7 @@ func main() {
 	if isExist(serviceProcessRawProxy, sFlags) {
 		fmt.Printf("Start worker for %s\n", serviceProcessRawProxy)
 		go func() {
-			if err := processRawProxy(rabbitConn); err != nil {
+			if err := processRawProxy(rabbitConn, postgresPool); err != nil {
 				panic(err)
 			}
 		}()

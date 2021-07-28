@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/streadway/amqp"
 )
 
@@ -153,7 +154,7 @@ func sendHTMLFromProxySourceToQueue(rabbitConn *amqp.Connection) error {
 	return nil
 }
 
-func processSourceHTML(rabbitConn *amqp.Connection, rdbForSites *redisDB, rdbForProxies *redisDB) error {
+func processSourceHTML(rabbitConn *amqp.Connection, rdbForSites *redisDB, rdbForProxies *redisDB, postgresPool *pgxpool.Pool) error {
 	chSource, err := rabbitConn.Channel()
 	if err != nil {
 		return err
@@ -171,6 +172,11 @@ func processSourceHTML(rabbitConn *amqp.Connection, rdbForSites *redisDB, rdbFor
 		return err
 	}
 	defer chDestProxySources.Close()
+
+	forbiddenDomains, err := blacklistDomains(postgresPool)
+	if err != nil {
+		return err
+	}
 
 	handler := func(in []byte) error {
 		fmt.Println(time.Now().Format("2006-01-02T15:04:05"), "processSourceHTML - start")
@@ -202,7 +208,7 @@ func processSourceHTML(rabbitConn *amqp.Connection, rdbForSites *redisDB, rdbFor
 			if !urlsHaveSameDomain(hPayload.FromURL, u) {
 				continue
 			}
-			if !possibleForProxySourceURL(u) {
+			if !possibleForProxySourceURL(u, forbiddenDomains) {
 				continue
 			}
 
@@ -227,18 +233,12 @@ func processSourceHTML(rabbitConn *amqp.Connection, rdbForSites *redisDB, rdbFor
 	return nil
 }
 
-func processRawProxy(rabbitConn *amqp.Connection) error {
-	chSource, err := rabbitConn.Channel()
+func processRawProxy(rabbitConn *amqp.Connection, postgresPool *pgxpool.Pool) error {
+	ch, err := rabbitConn.Channel()
 	if err != nil {
 		return err
 	}
-	defer chSource.Close()
-
-	chDest, err := rabbitConn.Channel()
-	if err != nil {
-		return err
-	}
-	defer chDest.Close()
+	defer ch.Close()
 
 	handler := func(in []byte) error {
 		fmt.Println(time.Now().Format("2006-01-02T15:04:05"), "processRawProxy - start")
@@ -251,27 +251,23 @@ func processRawProxy(rabbitConn *amqp.Connection) error {
 		if err != nil {
 			return err
 		}
-		tsNow := time.Now()
-		tsNowRFC3339 := tsNow.Format(time.RFC3339)
 
-		p := proxyPayload{
+		p := proxy{
 			URL:       string(in),
-			Anonymous: anonymous,
 			Type:      pType.verbose(),
-			TS:        tsNowRFC3339,
-		}
-		payloadJSON, err := json.Marshal(p)
-		if err != nil {
-			return err
+			Anonymous: anonymous,
+			Created:   ts,
+			LastCheck: ts,
 		}
 
-		if err := publish(chDest, queueProcessedProxies, payloadJSON); err != nil {
+		if err := saveProxyToDB(postgresPool, p); err != nil {
+			return err
 		}
 
 		return nil
 	}
 
-	if err := consume(chSource, queueRawProxies, handler); err != nil {
+	if err := consume(ch, queueRawProxies, handler); err != nil {
 		return err
 	}
 

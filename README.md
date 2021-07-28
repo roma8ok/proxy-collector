@@ -10,3 +10,6 @@ Start redis for collecting proxies:
 `docker run --name proxy-collector-redis-proxies -d -p 6380:6379 redis:6`
 
 Show all keys and values in redis: `for i in $(redis-cli KEYS '*'); do echo $i; redis-cli GET $i; done`
+
+Start postgres:
+`docker run --name proxy-collector-postgres -d -p 5432:5432 -e POSTGRES_USER=admin -e POSTGRES_PASSWORD=admin postgres:13`

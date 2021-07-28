@@ -1,3 +1,9 @@
+### 0.0.11 - 2021.07.28
+
+- added postgres
+- added started postgres migrations
+- saved processed proxy to postgres
+
 ### 0.0.10 - 2021.07.26
 
 - added proxies checker

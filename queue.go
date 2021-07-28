@@ -9,13 +9,6 @@ type htmlPayload struct {
 	FromURL string `json:"from_url"`
 }
 
-type proxyPayload struct {
-	URL       string `json:"url"`
-	Anonymous bool   `json:"anonymous"`
-	Type      string `json:"type"`
-	TS        string `json:"ts"`
-}
-
 func initQueues(conn *amqp.Connection, queues []string) error {
 	ch, err := conn.Channel()
 	if err != nil {

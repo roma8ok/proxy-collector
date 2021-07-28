@@ -9,7 +9,7 @@ import (
 	"net/url"
 	"path/filepath"
 
-	"golang.org/x/net/proxy"
+	netProxy "golang.org/x/net/proxy"
 )
 
 type proxyType int
@@ -32,19 +32,12 @@ func (t *proxyType) verbose() string {
 	return ""
 }
 
-func possibleForProxySourceURL(u string) bool {
+func possibleForProxySourceURL(u string, forbiddenDomains []string) bool {
 	uParsed, err := url.Parse(u)
 	if err != nil {
 		return false
 	}
 
-	forbiddenDomains := []string{
-		"dictionary.cambridge.org", "cambridge.org", "www.cambridge.org",
-		"microsoft.com", "www.microsoft.com",
-		"theunfolder.com", "www.theunfolder.com",
-		"zen.yandex.ru",
-		"avast.com", "www.avast.com",
-	}
 	if isExist(uParsed.Hostname(), forbiddenDomains) {
 		return false
 	}
@@ -105,7 +98,7 @@ func sendSOCKSCheckRequest(p string) (ip string, err error) {
 		KeepAlive: requestTimeout,
 	}
 
-	dialer, err := proxy.SOCKS5("tcp", p, nil, &d)
+	dialer, err := netProxy.SOCKS5("tcp", p, nil, &d)
 	if err != nil {
 		return
 	}

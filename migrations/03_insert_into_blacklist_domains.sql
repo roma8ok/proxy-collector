@@ -1,0 +1,18 @@
+INSERT INTO blacklist_domains (domain)
+VALUES ('dictionary.cambridge.org'),
+       ('cambridge.org'),
+       ('www.cambridge.org'),
+       ('microsoft.com'),
+       ('www.microsoft.com'),
+       ('theunfolder.com'),
+       ('www.theunfolder.com'),
+       ('zen.yandex.ru'),
+       ('avast.com'),
+       ('www.avast.com'),
+       ('techradar.com'),
+       ('lifehacker.ru'),
+       ('www.techradar.com'),
+       ('dictionary.com'),
+       ('www.dictionary.com'),
+       ('thesaurus.com'),
+       ('www.thesaurus.com')
