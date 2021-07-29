@@ -1,3 +1,8 @@
+### 0.0.12 - in progress
+
+- added config file
+- updated readme
+
 ### 0.0.11 - 2021.07.28
 
 - added postgres

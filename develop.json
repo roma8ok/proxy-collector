@@ -1,0 +1,6 @@
+{
+  "rabbit_url": "amqp://admin:admin@localhost:5672/",
+  "redis_url_for_sites": "redis://localhost:6379",
+  "redis_url_for_proxies": "redis://localhost:6380",
+  "postgres_url": "postgres://admin:admin@localhost:5432/admin"
+}

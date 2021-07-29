@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/signal"
 	"syscall"
@@ -13,42 +15,28 @@ import (
 	"github.com/streadway/amqp"
 )
 
-const (
-	proxyURL  = ""
-	userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36"
-
-	requestTimeout = 5 * time.Second
-
-	rabbitURL                = "amqp://admin:admin@localhost:5672/"
-	queueSearchBodiesFromDDG = "search_bodies_from_DDG"
-	queueProxySources        = "proxy_sources"
-	queueProxySourceHTML     = "proxy_source_html"
-	queueRawProxies          = "raw_proxies"
-
-	ipAPIURL = "https://api64.ipify.org"
-
-	redisURLForSites   = "redis://localhost:6379"
-	redisURLForProxies = "redis://localhost:6380"
-	redisExpiration    = time.Hour * 24
-
-	postgresURL = "postgres://admin:admin@localhost:5432/admin"
-
-	serviceSendSearchBodyFromDDGToQueue   = "sendSearchBodyFromDDGToQueue"
-	serviceProcessSearchBodyFromDDG       = "processSearchBodyFromDDG"
-	serviceSendHTMLFromProxySourceToQueue = "sendHTMLFromProxySourceToQueue"
-	serviceProcessSourceHTML              = "processSourceHTML"
-	serviceProcessRawProxy                = "processRawProxy"
-)
-
 func main() {
 	var sFlags arrayFlags
 	flag.Var(&sFlags, "service", fmt.Sprintf("Select one of more services for activate.\nAvailable: %s, %s, %s, %s, %s.", serviceSendSearchBodyFromDDGToQueue, serviceProcessSearchBodyFromDDG, serviceSendHTMLFromProxySourceToQueue, serviceProcessSourceHTML, serviceProcessRawProxy))
+	configFlag := flag.String("config", "", "Select config .json file.")
 	flag.Parse()
 	if len(sFlags) == 0 {
 		panic("Select one of more services for activate (flag -service)")
 	}
+	if *configFlag == "" {
+		panic("Select config file (flag -config)")
+	}
 
-	rabbitConn, err := amqp.Dial(rabbitURL)
+	confData, err := ioutil.ReadFile(*configFlag)
+	if err != nil {
+		panic("Config file is wrong")
+	}
+	var conf config
+	if err := json.Unmarshal(confData, &conf); err != nil {
+		panic("Config file is wrong")
+	}
+
+	rabbitConn, err := amqp.Dial(conf.RabbitURL)
 	if err != nil {
 		panic(err)
 	}
@@ -64,16 +52,16 @@ func main() {
 		panic(err)
 	}
 
-	rdbForSites, err := newRedisDB(redisURLForSites)
+	rdbForSites, err := newRedisDB(conf.RedisURLForSites)
 	if err != nil {
 		panic(err)
 	}
-	rdbForProxies, err := newRedisDB(redisURLForProxies)
+	rdbForProxies, err := newRedisDB(conf.RedisURLForProxies)
 	if err != nil {
 		panic(err)
 	}
 
-	postgresPool, err := pgxpool.Connect(context.Background(), postgresURL)
+	postgresPool, err := pgxpool.Connect(context.Background(), conf.PostgresURL)
 	if err != nil {
 		return
 	}
