@@ -1,6 +1,7 @@
 package main
 
 import (
+	"math/rand"
 	"net/url"
 )
 
@@ -22,6 +23,13 @@ func isExist(val string, arr []string) bool {
 		}
 	}
 	return false
+}
+
+func randomElementFromArray(arr []string) string {
+	if len(arr) == 0 {
+		return ""
+	}
+	return arr[rand.Intn(len(arr))]
 }
 
 func urlsHaveSameDomain(u1, u2 string) bool {

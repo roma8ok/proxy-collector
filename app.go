@@ -11,6 +11,7 @@ const (
 
 	requestTimeout = 5 * time.Second
 
+	queueSearchQueries       = "search_queries"
 	queueSearchBodiesFromDDG = "search_bodies_from_DDG"
 	queueProxySources        = "proxy_sources"
 	queueProxySourceHTML     = "proxy_source_html"
@@ -20,6 +21,7 @@ const (
 
 	redisExpiration = time.Hour * 24
 
+	serviceFillSearchQueries              = "fillSearchQueries"
 	serviceSendSearchBodyFromDDGToQueue   = "sendSearchBodyFromDDGToQueue"
 	serviceProcessSearchBodyFromDDG       = "processSearchBodyFromDDG"
 	serviceSendHTMLFromProxySourceToQueue = "sendHTMLFromProxySourceToQueue"

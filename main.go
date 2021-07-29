@@ -16,11 +16,11 @@ import (
 )
 
 func main() {
-	var sFlags arrayFlags
-	flag.Var(&sFlags, "service", fmt.Sprintf("Select one of more services for activate.\nAvailable: %s, %s, %s, %s, %s.", serviceSendSearchBodyFromDDGToQueue, serviceProcessSearchBodyFromDDG, serviceSendHTMLFromProxySourceToQueue, serviceProcessSourceHTML, serviceProcessRawProxy))
+	var serviceFlags arrayFlags
+	flag.Var(&serviceFlags, "service", fmt.Sprintf("Select one of more services for activate.\nAvailable: %s, %s, %s, %s, %s, %s.", serviceFillSearchQueries, serviceSendSearchBodyFromDDGToQueue, serviceProcessSearchBodyFromDDG, serviceSendHTMLFromProxySourceToQueue, serviceProcessSourceHTML, serviceProcessRawProxy))
 	configFlag := flag.String("config", "", "Select config .json file.")
 	flag.Parse()
-	if len(sFlags) == 0 {
+	if len(serviceFlags) == 0 {
 		panic("Select one of more services for activate (flag -service)")
 	}
 	if *configFlag == "" {
@@ -47,7 +47,7 @@ func main() {
 		}
 	}(rabbitConn)
 
-	queues := []string{queueSearchBodiesFromDDG, queueProxySources, queueProxySourceHTML, queueRawProxies}
+	queues := []string{queueSearchQueries, queueSearchBodiesFromDDG, queueProxySources, queueProxySourceHTML, queueRawProxies}
 	if err := initQueues(rabbitConn, queues); err != nil {
 		panic(err)
 	}
@@ -70,21 +70,30 @@ func main() {
 	exit := make(chan os.Signal, 1)
 	signal.Notify(exit, syscall.SIGINT, syscall.SIGTERM)
 
-	if isExist(serviceSendSearchBodyFromDDGToQueue, sFlags) {
-		fmt.Printf("Start worker for %s\n", serviceSendSearchBodyFromDDGToQueue)
+	if isExist(serviceFillSearchQueries, serviceFlags) {
+		fmt.Printf("Start worker for %s\n", serviceFillSearchQueries)
 		go func() {
+			fromProxies := false
 			for {
-				for _, query := range []string{"proxy list", "proxy", "proxies", "прокси", "список прокси"} {
-					if err := sendSearchBodyFromDDGToQueue(rabbitConn, query, proxyURL, userAgent); err != nil {
-						panic(err)
-					}
-					time.Sleep(time.Minute)
+				if err := fillSearchQueries(rabbitConn, postgresPool, fromProxies); err != nil {
+					panic(err)
 				}
+				fromProxies = !fromProxies
+				time.Sleep(time.Minute)
 			}
 		}()
 	}
 
-	if isExist(serviceProcessSearchBodyFromDDG, sFlags) {
+	if isExist(serviceSendSearchBodyFromDDGToQueue, serviceFlags) {
+		fmt.Printf("Start worker for %s\n", serviceSendSearchBodyFromDDGToQueue)
+		go func() {
+			if err := sendSearchBodyFromDDGToQueue(rabbitConn, proxyURL, userAgent); err != nil {
+				panic(err)
+			}
+		}()
+	}
+
+	if isExist(serviceProcessSearchBodyFromDDG, serviceFlags) {
 		fmt.Printf("Start worker for %s\n", serviceProcessSearchBodyFromDDG)
 		go func() {
 			if err := processSearchBodyFromDDG(rabbitConn, rdbForSites); err != nil {
@@ -93,7 +102,7 @@ func main() {
 		}()
 	}
 
-	if isExist(serviceSendHTMLFromProxySourceToQueue, sFlags) {
+	if isExist(serviceSendHTMLFromProxySourceToQueue, serviceFlags) {
 		fmt.Printf("Start worker for %s\n", serviceSendHTMLFromProxySourceToQueue)
 		go func() {
 			if err := sendHTMLFromProxySourceToQueue(rabbitConn); err != nil {
@@ -102,7 +111,7 @@ func main() {
 		}()
 	}
 
-	if isExist(serviceProcessSourceHTML, sFlags) {
+	if isExist(serviceProcessSourceHTML, serviceFlags) {
 		fmt.Printf("Start worker for %s\n", serviceProcessSourceHTML)
 		go func() {
 			if err := processSourceHTML(rabbitConn, rdbForSites, rdbForProxies, postgresPool); err != nil {
@@ -111,7 +120,7 @@ func main() {
 		}()
 	}
 
-	if isExist(serviceProcessRawProxy, sFlags) {
+	if isExist(serviceProcessRawProxy, serviceFlags) {
 		fmt.Printf("Start worker for %s\n", serviceProcessRawProxy)
 		go func() {
 			if err := processRawProxy(rabbitConn, postgresPool); err != nil {

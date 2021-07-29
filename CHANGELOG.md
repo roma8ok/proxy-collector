@@ -2,6 +2,7 @@
 
 - added config file
 - updated readme
+- added service to fill search queries
 
 ### 0.0.11 - 2021.07.28
 

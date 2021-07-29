@@ -11,40 +11,93 @@ import (
 	"github.com/streadway/amqp"
 )
 
-func sendSearchBodyFromDDGToQueue(conn *amqp.Connection, searchQuery, proxyURL, userAgent string) error {
-	fmt.Println(time.Now().Format("2006-01-02T15:04:05"), "sendSearchBodyFromDDGToQueue - start")
-	ts := time.Now()
-	defer func(ts time.Time) {
-		fmt.Println(time.Now().Format("2006-01-02T15:04:05"), "sendSearchBodyFromDDGToQueue end", time.Now().Sub(ts))
-	}(ts)
-
-	searchURL := makeDDGSearchURL(searchQuery)
-
-	var headers = map[string]string{
-		"Content-Type": "text/html; charset=UTF-8",
-		"User-Agent":   userAgent,
-	}
-
-	resp, err := sendRequest(searchURL, proxyURL, headers)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return err
-	}
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-
-	ch, err := conn.Channel()
+func fillSearchQueries(rabbitConn *amqp.Connection, postgresPool *pgxpool.Pool, fromProxies bool) error {
+	ch, err := rabbitConn.Channel()
 	if err != nil {
 		return err
 	}
 	defer ch.Close()
-	if err := publish(ch, queueSearchBodiesFromDDG, body); err != nil {
+
+	fmt.Println(time.Now().Format("2006-01-02T15:04:05"), "fillSearchQueries - start")
+	ts := time.Now()
+	defer func(ts time.Time) {
+		fmt.Println(time.Now().Format("2006-01-02T15:04:05"), "fillSearchQueries end", time.Now().Sub(ts))
+	}(ts)
+
+	var q string
+	proxies := make([]string, 0)
+	if fromProxies {
+		freshProxyList, err := freshProxies(postgresPool)
+		if err == nil {
+			for _, fProxy := range freshProxyList {
+				proxies = append(proxies, fProxy.URL)
+			}
+		}
+	}
+
+	if len(proxies) > 0 {
+		q = randomElementFromArray(proxies)
+	} else {
+		queries := []string{"proxy list", "proxy", "proxies", "прокси", "список прокси"}
+		q = randomElementFromArray(queries)
+	}
+
+	if err := publish(ch, queueSearchQueries, []byte(q)); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func sendSearchBodyFromDDGToQueue(rabbitConn *amqp.Connection, proxyURL, userAgent string) error {
+	chSource, err := rabbitConn.Channel()
+	if err != nil {
+		return err
+	}
+	defer chSource.Close()
+
+	chDest, err := rabbitConn.Channel()
+	if err != nil {
+		return err
+	}
+	defer chDest.Close()
+
+	handler := func(in []byte) error {
+		fmt.Println(time.Now().Format("2006-01-02T15:04:05"), "sendSearchBodyFromDDGToQueue - start")
+		ts := time.Now()
+		defer func(ts time.Time) {
+			fmt.Println(time.Now().Format("2006-01-02T15:04:05"), "sendSearchBodyFromDDGToQueue end", time.Now().Sub(ts))
+		}(ts)
+
+		searchURL := makeDDGSearchURL(string(in))
+
+		var headers = map[string]string{
+			"Content-Type": "text/html; charset=UTF-8",
+			"User-Agent":   userAgent,
+		}
+
+		resp, err := sendRequest(searchURL, proxyURL, headers)
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			return err
+		}
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return err
+		}
+
+		if err := publish(chDest, queueSearchBodiesFromDDG, body); err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	if err := consume(chSource, queueSearchQueries, handler); err != nil {
 		return err
 	}
 

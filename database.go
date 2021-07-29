@@ -121,3 +121,31 @@ func saveProxyToDB(pool *pgxpool.Pool, p proxy) error {
 
 	return nil
 }
+
+func freshProxies(pool *pgxpool.Pool) (proxies []proxy, err error) {
+	s, args, err := sq.Select("id", "url", "type", "anonymous", "created", "last_check").
+		From(tableProxies).
+		Where(sq.GtOrEq{"last_check": time.Now().Add(-1 * time.Minute * 60)}).
+		PlaceholderFormat(sq.Dollar).
+		ToSql()
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := pool.Query(context.Background(), s, args...)
+	if rows != nil {
+		if err := rows.Err(); err != nil {
+			return nil, err
+		}
+
+		for rows.Next() {
+			var p proxy
+			if err := rows.Scan(&p.ID, &p.URL, &p.Type, &p.Anonymous, &p.Created, &p.LastCheck); err != nil {
+				return nil, err
+			}
+			proxies = append(proxies, p)
+		}
+	}
+
+	return proxies, nil
+}
