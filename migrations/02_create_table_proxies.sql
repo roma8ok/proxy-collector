@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS proxies
 (
     id         SERIAL PRIMARY KEY,
     url        VARCHAR(256) NOT NULL UNIQUE,
+    active     BOOLEAN      NOT NULL,
     type       proxy_type   NOT NULL,
     anonymous  BOOLEAN      NOT NULL,
     created    TIMESTAMPTZ  NOT NULL,

@@ -11,11 +11,12 @@ const (
 
 	requestTimeout = 5 * time.Second
 
-	queueSearchQueries       = "search_queries"
-	queueSearchBodiesFromDDG = "search_bodies_from_DDG"
-	queueProxySources        = "proxy_sources"
-	queueProxySourceHTML     = "proxy_source_html"
-	queueRawProxies          = "raw_proxies"
+	queueSearchQueries       = "1_search_queries"
+	queueSearchBodiesFromDDG = "2_search_bodies_from_DDG"
+	queueProxySources        = "3_proxy_sources"
+	queueProxySourceHTML     = "4_proxy_source_html"
+	queueRawProxies          = "5_raw_proxies"
+	queueCheckProxies        = "6_check_proxies"
 
 	ipAPIURL = "https://api64.ipify.org"
 
@@ -27,6 +28,8 @@ const (
 	serviceSendHTMLFromProxySourceToQueue = "sendHTMLFromProxySourceToQueue"
 	serviceProcessSourceHTML              = "processSourceHTML"
 	serviceProcessRawProxy                = "processRawProxy"
+	serviceFillCheckProxiesQueue          = "fillCheckProxiesQueue"
+	serviceProcessCheckProxies            = "processCheckProxies"
 )
 
 type config struct {

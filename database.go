@@ -39,6 +39,7 @@ func blacklistDomains(pool *pgxpool.Pool) (domains []string, err error) {
 
 type proxy struct {
 	ID        int
+	Active    bool
 	URL       string
 	Type      string
 	Anonymous bool
@@ -69,8 +70,8 @@ func proxyExistInDB(pool *pgxpool.Pool, u string) bool {
 func insertProxyIntoDB(pool *pgxpool.Pool, p proxy) error {
 	s, args, err := sq.
 		Insert(tableProxies).
-		Columns("url", "type", "anonymous", "created", "last_check").
-		Values(p.URL, p.Type, p.Anonymous, p.Created, p.LastCheck).
+		Columns("url", "active", "type", "anonymous", "created", "last_check").
+		Values(p.URL, p.Active, p.Type, p.Anonymous, p.Created, p.LastCheck).
 		PlaceholderFormat(sq.Dollar).
 		ToSql()
 	if err != nil {
@@ -89,6 +90,7 @@ func updateProxyInDB(pool *pgxpool.Pool, p proxy) error {
 	s, args, err := sq.
 		Update("proxies").
 		Where(sq.Eq{"url": p.URL}).
+		Set("active", p.Active).
 		Set("type", p.Type).
 		Set("anonymous", p.Anonymous).
 		Set("last_check", p.LastCheck).
@@ -122,10 +124,30 @@ func saveProxyToDB(pool *pgxpool.Pool, p proxy) error {
 	return nil
 }
 
-func freshProxies(pool *pgxpool.Pool) (proxies []proxy, err error) {
-	s, args, err := sq.Select("id", "url", "type", "anonymous", "created", "last_check").
+func changeProxyToInactive(pool *pgxpool.Pool, pURL string) error {
+	s, args, err := sq.
+		Update("proxies").
+		Where(sq.Eq{"url": pURL}).
+		Set("active", false).
+		Set("last_check", time.Now()).
+		PlaceholderFormat(sq.Dollar).
+		ToSql()
+	if err != nil {
+		return err
+	}
+
+	_, err = pool.Exec(context.Background(), s, args...)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func freshProxies(pool *pgxpool.Pool, duration time.Duration) (proxies []proxy, err error) {
+	s, args, err := sq.Select("id", "url", "active", "type", "anonymous", "created", "last_check").
 		From(tableProxies).
-		Where(sq.GtOrEq{"last_check": time.Now().Add(-1 * time.Minute * 60)}).
+		Where(sq.GtOrEq{"last_check": time.Now().Add(-1 * duration)}).
 		PlaceholderFormat(sq.Dollar).
 		ToSql()
 	if err != nil {
@@ -140,7 +162,35 @@ func freshProxies(pool *pgxpool.Pool) (proxies []proxy, err error) {
 
 		for rows.Next() {
 			var p proxy
-			if err := rows.Scan(&p.ID, &p.URL, &p.Type, &p.Anonymous, &p.Created, &p.LastCheck); err != nil {
+			if err := rows.Scan(&p.ID, &p.URL, &p.Active, &p.Type, &p.Anonymous, &p.Created, &p.LastCheck); err != nil {
+				return nil, err
+			}
+			proxies = append(proxies, p)
+		}
+	}
+
+	return proxies, nil
+}
+
+func proxiesFromDB(pool *pgxpool.Pool, active bool) (proxies []proxy, err error) {
+	s, args, err := sq.Select("id", "url", "active", "type", "anonymous", "created", "last_check").
+		From(tableProxies).
+		Where(sq.Eq{"active": active}).
+		PlaceholderFormat(sq.Dollar).
+		ToSql()
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := pool.Query(context.Background(), s, args...)
+	if rows != nil {
+		if err := rows.Err(); err != nil {
+			return nil, err
+		}
+
+		for rows.Next() {
+			var p proxy
+			if err := rows.Scan(&p.ID, &p.URL, &p.Active, &p.Type, &p.Anonymous, &p.Created, &p.LastCheck); err != nil {
 				return nil, err
 			}
 			proxies = append(proxies, p)

@@ -15,4 +15,7 @@ VALUES ('dictionary.cambridge.org'),
        ('dictionary.com'),
        ('www.dictionary.com'),
        ('thesaurus.com'),
-       ('www.thesaurus.com')
+       ('www.thesaurus.com'),
+       ('wizcase.com'),
+       ('www.wizcase.com'),
+       ('vc.ru')

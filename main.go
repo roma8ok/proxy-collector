@@ -17,7 +17,7 @@ import (
 
 func main() {
 	var serviceFlags arrayFlags
-	flag.Var(&serviceFlags, "service", fmt.Sprintf("Select one of more services for activate.\nAvailable: %s, %s, %s, %s, %s, %s.", serviceFillSearchQueries, serviceSendSearchBodyFromDDGToQueue, serviceProcessSearchBodyFromDDG, serviceSendHTMLFromProxySourceToQueue, serviceProcessSourceHTML, serviceProcessRawProxy))
+	flag.Var(&serviceFlags, "service", fmt.Sprintf("Select one of more services for activate.\nAvailable: %s, %s, %s, %s, %s, %s, %s, %s.", serviceFillSearchQueries, serviceSendSearchBodyFromDDGToQueue, serviceProcessSearchBodyFromDDG, serviceSendHTMLFromProxySourceToQueue, serviceProcessSourceHTML, serviceProcessRawProxy, serviceFillCheckProxiesQueue, serviceProcessCheckProxies))
 	configFlag := flag.String("config", "", "Select config .json file.")
 	flag.Parse()
 	if len(serviceFlags) == 0 {
@@ -47,7 +47,7 @@ func main() {
 		}
 	}(rabbitConn)
 
-	queues := []string{queueSearchQueries, queueSearchBodiesFromDDG, queueProxySources, queueProxySourceHTML, queueRawProxies}
+	queues := []string{queueSearchQueries, queueSearchBodiesFromDDG, queueProxySources, queueProxySourceHTML, queueRawProxies, queueCheckProxies}
 	if err := initQueues(rabbitConn, queues); err != nil {
 		panic(err)
 	}
@@ -124,6 +124,27 @@ func main() {
 		fmt.Printf("Start worker for %s\n", serviceProcessRawProxy)
 		go func() {
 			if err := processRawProxy(rabbitConn, postgresPool); err != nil {
+				panic(err)
+			}
+		}()
+	}
+
+	if isExist(serviceFillCheckProxiesQueue, serviceFlags) {
+		fmt.Printf("Start worker for %s\n", serviceFillCheckProxiesQueue)
+		go func() {
+			for {
+				if err := fillCheckProxiesQueue(rabbitConn, postgresPool); err != nil {
+					panic(err)
+				}
+				time.Sleep(time.Minute)
+			}
+		}()
+	}
+
+	if isExist(serviceProcessCheckProxies, serviceFlags) {
+		fmt.Printf("Start worker for %s\n", serviceProcessCheckProxies)
+		go func() {
+			if err := processCheckProxy(rabbitConn, postgresPool); err != nil {
 				panic(err)
 			}
 		}()

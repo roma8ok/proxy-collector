@@ -1,8 +1,10 @@
-### 0.0.12 - in progress
+### 0.0.12 - 2021.08.01
 
 - added config file
 - updated readme
-- added service to fill search queries
+- added service to fill search queries queue
+- added service to fill check proxies queue
+- added service to process check proxy
 
 ### 0.0.11 - 2021.07.28
 

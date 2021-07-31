@@ -27,7 +27,7 @@ func fillSearchQueries(rabbitConn *amqp.Connection, postgresPool *pgxpool.Pool, 
 	var q string
 	proxies := make([]string, 0)
 	if fromProxies {
-		freshProxyList, err := freshProxies(postgresPool)
+		freshProxyList, err := freshProxies(postgresPool, time.Minute*60)
 		if err == nil {
 			for _, fProxy := range freshProxyList {
 				proxies = append(proxies, fProxy.URL)
@@ -307,6 +307,7 @@ func processRawProxy(rabbitConn *amqp.Connection, postgresPool *pgxpool.Pool) er
 
 		p := proxy{
 			URL:       string(in),
+			Active:    true,
 			Type:      pType.verbose(),
 			Anonymous: anonymous,
 			Created:   ts,
@@ -321,6 +322,77 @@ func processRawProxy(rabbitConn *amqp.Connection, postgresPool *pgxpool.Pool) er
 	}
 
 	if err := consume(ch, queueRawProxies, handler); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func fillCheckProxiesQueue(rabbitConn *amqp.Connection, postgresPool *pgxpool.Pool) error {
+	ch, err := rabbitConn.Channel()
+	if err != nil {
+		return err
+	}
+	defer ch.Close()
+
+	fmt.Println(time.Now().Format("2006-01-02T15:04:05"), "fillCheckProxiesQueue - start")
+	ts := time.Now()
+	defer func(ts time.Time) {
+		fmt.Println(time.Now().Format("2006-01-02T15:04:05"), "fillCheckProxiesQueue end", time.Now().Sub(ts))
+	}(ts)
+
+	proxies, err := freshProxies(postgresPool, time.Hour*24)
+	if err != nil {
+		return err
+	}
+	for _, p := range proxies {
+		if err := publish(ch, queueCheckProxies, []byte(p.URL)); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func processCheckProxy(rabbitConn *amqp.Connection, postgresPool *pgxpool.Pool) error {
+	ch, err := rabbitConn.Channel()
+	if err != nil {
+		return err
+	}
+	defer ch.Close()
+
+	handler := func(in []byte) error {
+		fmt.Println(time.Now().Format("2006-01-02T15:04:05"), "processCheckProxy - start")
+		ts := time.Now()
+		defer func(ts time.Time) {
+			fmt.Println(time.Now().Format("2006-01-02T15:04:05"), "processCheckProxy end", time.Now().Sub(ts))
+		}(ts)
+
+		proxyURL := string(in)
+
+		pType, anonymous, err := checkProxy(proxyURL)
+		if err != nil {
+			if err := changeProxyToInactive(postgresPool, proxyURL); err != nil {
+			}
+			return err
+		}
+
+		p := proxy{
+			URL:       proxyURL,
+			Active:    true,
+			Type:      pType.verbose(),
+			Anonymous: anonymous,
+			LastCheck: ts,
+		}
+
+		if err := updateProxyInDB(postgresPool, p); err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	if err := consume(ch, queueCheckProxies, handler); err != nil {
 		return err
 	}
 
