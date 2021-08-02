@@ -1,8 +1,10 @@
 package main
 
 import (
-	"fmt"
 	"time"
+
+	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/streadway/amqp"
 )
 
 const (
@@ -18,9 +20,9 @@ const (
 	queueRawProxies          = "5_raw_proxies"
 	queueCheckProxies        = "6_check_proxies"
 
-	ipAPIURL = "https://api64.ipify.org"
-
 	redisExpiration = time.Hour * 24
+
+	lokiBatchWait = time.Second * 5
 
 	serviceFillSearchQueries              = "fillSearchQueries"
 	serviceSendSearchBodyFromDDGToQueue   = "sendSearchBodyFromDDGToQueue"
@@ -32,20 +34,20 @@ const (
 	serviceProcessCheckProxies            = "processCheckProxies"
 )
 
-type config struct {
+type Config struct {
 	RabbitURL          string `json:"rabbit_url"`
 	RedisURLForSites   string `json:"redis_url_for_sites"`
 	RedisURLForProxies string `json:"redis_url_for_proxies"`
 	PostgresURL        string `json:"postgres_url"`
+	IPAPIURL           string `json:"ip_api_url"`
+	PromtailURL        string `json:"promtail_url"`
 }
 
-type arrayFlags []string
-
-func (i *arrayFlags) String() string {
-	return fmt.Sprint(*i)
-}
-
-func (i *arrayFlags) Set(value string) error {
-	*i = append(*i, value)
-	return nil
+type App struct {
+	loki          Logger
+	rabbitConn    *amqp.Connection
+	postgresPool  *pgxpool.Pool
+	rdbForSites   *redisDB
+	rdbForProxies *redisDB
+	conf          Config
 }

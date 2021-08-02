@@ -3,31 +3,32 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"time"
 
-	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/pkg/errors"
 	"github.com/streadway/amqp"
 )
 
-func fillSearchQueries(rabbitConn *amqp.Connection, postgresPool *pgxpool.Pool, fromProxies bool) error {
-	ch, err := rabbitConn.Channel()
+func fillSearchQueries(app App, fromProxies bool) error {
+	startTime := time.Now()
+
+	ch, err := app.rabbitConn.Channel()
 	if err != nil {
 		return err
 	}
-	defer ch.Close()
-
-	fmt.Println(time.Now().Format("2006-01-02T15:04:05"), "fillSearchQueries - start")
-	ts := time.Now()
-	defer func(ts time.Time) {
-		fmt.Println(time.Now().Format("2006-01-02T15:04:05"), "fillSearchQueries end", time.Now().Sub(ts))
-	}(ts)
+	defer func(ch *amqp.Channel) {
+		if err := ch.Close(); err != nil {
+			app.loki.error(errors.WithStack(err))
+		}
+	}(ch)
 
 	var q string
 	proxies := make([]string, 0)
 	if fromProxies {
-		freshProxyList, err := freshProxies(postgresPool, time.Minute*60)
+		freshProxyList, err := freshProxies(app.postgresPool, time.Minute*60)
 		if err == nil {
 			for _, fProxy := range freshProxyList {
 				proxies = append(proxies, fProxy.URL)
@@ -46,28 +47,33 @@ func fillSearchQueries(rabbitConn *amqp.Connection, postgresPool *pgxpool.Pool, 
 		return err
 	}
 
+	app.loki.info(fmt.Sprintf(`done in %s; added "%s"`, formatDuration(time.Now().Sub(startTime)), q))
 	return nil
 }
 
-func sendSearchBodyFromDDGToQueue(rabbitConn *amqp.Connection, proxyURL, userAgent string) error {
-	chSource, err := rabbitConn.Channel()
+func sendSearchBodyFromDDGToQueue(app App, proxyURL, userAgent string) error {
+	chSource, err := app.rabbitConn.Channel()
 	if err != nil {
 		return err
 	}
-	defer chSource.Close()
+	defer func(chSource *amqp.Channel) {
+		if err := chSource.Close(); err != nil {
+			app.loki.error(errors.WithStack(err))
+		}
+	}(chSource)
 
-	chDest, err := rabbitConn.Channel()
+	chDest, err := app.rabbitConn.Channel()
 	if err != nil {
 		return err
 	}
-	defer chDest.Close()
+	defer func(chDest *amqp.Channel) {
+		if err := chDest.Close(); err != nil {
+			app.loki.error(errors.WithStack(err))
+		}
+	}(chDest)
 
 	handler := func(in []byte) error {
-		fmt.Println(time.Now().Format("2006-01-02T15:04:05"), "sendSearchBodyFromDDGToQueue - start")
-		ts := time.Now()
-		defer func(ts time.Time) {
-			fmt.Println(time.Now().Format("2006-01-02T15:04:05"), "sendSearchBodyFromDDGToQueue end", time.Now().Sub(ts))
-		}(ts)
+		startTime := time.Now()
 
 		searchURL := makeDDGSearchURL(string(in))
 
@@ -80,7 +86,11 @@ func sendSearchBodyFromDDGToQueue(rabbitConn *amqp.Connection, proxyURL, userAge
 		if err != nil {
 			return err
 		}
-		defer resp.Body.Close()
+		defer func(Body io.ReadCloser) {
+			if err := Body.Close(); err != nil {
+				app.loki.error(errors.WithStack(err))
+			}
+		}(resp.Body)
 
 		if resp.StatusCode != http.StatusOK {
 			return err
@@ -94,6 +104,7 @@ func sendSearchBodyFromDDGToQueue(rabbitConn *amqp.Connection, proxyURL, userAge
 			return err
 		}
 
+		app.loki.info(fmt.Sprintf(`done in %s; added body from "%s"`, formatDuration(time.Now().Sub(startTime)), searchURL))
 		return nil
 	}
 
@@ -104,29 +115,34 @@ func sendSearchBodyFromDDGToQueue(rabbitConn *amqp.Connection, proxyURL, userAge
 	return nil
 }
 
-func processSearchBodyFromDDG(rabbitConn *amqp.Connection, rdb *redisDB) error {
-	chSource, err := rabbitConn.Channel()
+func processSearchBodyFromDDG(app App) error {
+	chSource, err := app.rabbitConn.Channel()
 	if err != nil {
 		return err
 	}
-	defer chSource.Close()
+	defer func(chSource *amqp.Channel) {
+		if err := chSource.Close(); err != nil {
+			app.loki.error(errors.WithStack(err))
+		}
+	}(chSource)
 
-	chDest, err := rabbitConn.Channel()
+	chDest, err := app.rabbitConn.Channel()
 	if err != nil {
 		return err
 	}
-	defer chDest.Close()
+	defer func(chDest *amqp.Channel) {
+		if err := chDest.Close(); err != nil {
+			app.loki.error(errors.WithStack(err))
+		}
+	}(chDest)
 
 	handler := func(in []byte) error {
-		fmt.Println(time.Now().Format("2006-01-02T15:04:05"), "processSearchBodyFromDDG - start")
-		ts := time.Now()
-		defer func(ts time.Time) {
-			fmt.Println(time.Now().Format("2006-01-02T15:04:05"), "processSearchBodyFromDDG end", time.Now().Sub(ts))
-		}(ts)
+		startTime := time.Now()
 
 		urls := findSiteURLsFromDDG(string(in))
+		addedUrls := 0
 		for _, u := range urls {
-			changeType, err := rdb.set(u)
+			changeType, err := app.rdbForSites.set(u)
 			if err != nil {
 				return err
 			}
@@ -135,8 +151,11 @@ func processSearchBodyFromDDG(rabbitConn *amqp.Connection, rdb *redisDB) error {
 				if err := publish(chDest, queueProxySources, []byte(u)); err != nil {
 					return err
 				}
+				addedUrls += 1
 			}
 		}
+
+		app.loki.info(fmt.Sprintf(`done in %s; handled %d urls, added %d urls`, formatDuration(time.Now().Sub(startTime)), len(urls), addedUrls))
 		return nil
 	}
 
@@ -147,36 +166,45 @@ func processSearchBodyFromDDG(rabbitConn *amqp.Connection, rdb *redisDB) error {
 	return nil
 }
 
-func sendHTMLFromProxySourceToQueue(rabbitConn *amqp.Connection) error {
-	chSource, err := rabbitConn.Channel()
+func sendHTMLFromProxySourceToQueue(app App) error {
+	chSource, err := app.rabbitConn.Channel()
 	if err != nil {
 		return err
 	}
-	defer chSource.Close()
+	defer func(chSource *amqp.Channel) {
+		if err := chSource.Close(); err != nil {
+			app.loki.error(errors.WithStack(err))
+		}
+	}(chSource)
 
-	chDest, err := rabbitConn.Channel()
+	chDest, err := app.rabbitConn.Channel()
 	if err != nil {
 		return err
 	}
-	defer chDest.Close()
+	defer func(chDest *amqp.Channel) {
+		if err := chDest.Close(); err != nil {
+			app.loki.error(errors.WithStack(err))
+		}
+	}(chDest)
 
 	handler := func(in []byte) error {
-		fmt.Println(time.Now().Format("2006-01-02T15:04:05"), "sendHTMLFromProxySourceToQueue - start with", string(in))
-		ts := time.Now()
-		defer func(ts time.Time) {
-			fmt.Println(time.Now().Format("2006-01-02T15:04:05"), "sendHTMLFromProxySourceToQueue end", time.Now().Sub(ts))
-		}(ts)
+		startTime := time.Now()
 
 		var headers = map[string]string{
 			"Content-Type": "text/html; charset=UTF-8",
 			"User-Agent":   userAgent,
 		}
 
-		resp, err := sendRequest(string(in), proxyURL, headers)
+		u := string(in)
+		resp, err := sendRequest(u, proxyURL, headers)
 		if err != nil {
 			return err
 		}
-		defer resp.Body.Close()
+		defer func(Body io.ReadCloser) {
+			if err := Body.Close(); err != nil {
+				app.loki.error(errors.WithStack(err))
+			}
+		}(resp.Body)
 
 		if resp.StatusCode != http.StatusOK {
 			return err
@@ -187,7 +215,7 @@ func sendHTMLFromProxySourceToQueue(rabbitConn *amqp.Connection) error {
 		}
 		hPayload := htmlPayload{
 			HTML:    string(body),
-			FromURL: string(in),
+			FromURL: u,
 		}
 		hPayloadJSON, err := json.Marshal(hPayload)
 		if err != nil {
@@ -197,6 +225,8 @@ func sendHTMLFromProxySourceToQueue(rabbitConn *amqp.Connection) error {
 		if err := publish(chDest, queueProxySourceHTML, hPayloadJSON); err != nil {
 			return err
 		}
+
+		app.loki.info(fmt.Sprintf(`done in %s; added body from "%s"`, formatDuration(time.Now().Sub(startTime)), u))
 		return nil
 	}
 
@@ -207,36 +237,44 @@ func sendHTMLFromProxySourceToQueue(rabbitConn *amqp.Connection) error {
 	return nil
 }
 
-func processSourceHTML(rabbitConn *amqp.Connection, rdbForSites *redisDB, rdbForProxies *redisDB, postgresPool *pgxpool.Pool) error {
-	chSource, err := rabbitConn.Channel()
+func processSourceHTML(app App) error {
+	chSource, err := app.rabbitConn.Channel()
 	if err != nil {
 		return err
 	}
-	defer chSource.Close()
+	defer func(chSource *amqp.Channel) {
+		if err := chSource.Close(); err != nil {
+			app.loki.error(errors.WithStack(err))
+		}
+	}(chSource)
 
-	chDestRawProxies, err := rabbitConn.Channel()
+	chDestRawProxies, err := app.rabbitConn.Channel()
 	if err != nil {
 		return err
 	}
-	defer chDestRawProxies.Close()
+	defer func(chDestRawProxies *amqp.Channel) {
+		if err := chDestRawProxies.Close(); err != nil {
+			app.loki.error(errors.WithStack(err))
+		}
+	}(chDestRawProxies)
 
-	chDestProxySources, err := rabbitConn.Channel()
+	chDestProxySources, err := app.rabbitConn.Channel()
 	if err != nil {
 		return err
 	}
-	defer chDestProxySources.Close()
+	defer func(chDestProxySources *amqp.Channel) {
+		if err := chDestProxySources.Close(); err != nil {
+			app.loki.error(errors.WithStack(err))
+		}
+	}(chDestProxySources)
 
-	forbiddenDomains, err := blacklistDomains(postgresPool)
+	forbiddenDomains, err := blacklistDomains(app.postgresPool)
 	if err != nil {
 		return err
 	}
 
 	handler := func(in []byte) error {
-		fmt.Println(time.Now().Format("2006-01-02T15:04:05"), "processSourceHTML - start")
-		ts := time.Now()
-		defer func(ts time.Time) {
-			fmt.Println(time.Now().Format("2006-01-02T15:04:05"), "processSourceHTML end", time.Now().Sub(ts))
-		}(ts)
+		startTime := time.Now()
 
 		var hPayload htmlPayload
 		if err := json.Unmarshal(in, &hPayload); err != nil {
@@ -244,38 +282,47 @@ func processSourceHTML(rabbitConn *amqp.Connection, rdbForSites *redisDB, rdbFor
 		}
 
 		proxies := findProxiesFromHTML(hPayload.HTML)
+		addedProxies := 0
 		for _, p := range proxies {
-			changeType, err := rdbForProxies.set(p)
+			changeType, err := app.rdbForProxies.set(p)
 			if err != nil {
 				return err
 			}
 			switch changeType {
 			case redisChangeAdd, redisChangeUpdate:
 				if err := publish(chDestRawProxies, queueRawProxies, []byte(p)); err != nil {
+					app.loki.error(errors.WithStack(err))
 				}
+				addedProxies += 1
 			}
 		}
 
 		urls := findURLsFromHTML(hPayload.HTML)
-		for _, u := range urls {
-			if !urlsHaveSameDomain(hPayload.FromURL, u) {
-				continue
-			}
-			if !possibleForProxySourceURL(u, forbiddenDomains) {
-				continue
-			}
+		addedURLs := 0
+		if len(proxies) > 0 {
+			for _, u := range urls {
+				if !urlsHaveSameDomain(hPayload.FromURL, u) {
+					continue
+				}
+				if !possibleForProxySourceURL(u, forbiddenDomains) {
+					continue
+				}
 
-			changeType, err := rdbForSites.set(u)
-			if err != nil {
-				return err
-			}
-			switch changeType {
-			case redisChangeAdd, redisChangeUpdate:
-				if err := publish(chDestProxySources, queueProxySources, []byte(u)); err != nil {
+				changeType, err := app.rdbForSites.set(u)
+				if err != nil {
+					return err
+				}
+				switch changeType {
+				case redisChangeAdd, redisChangeUpdate:
+					if err := publish(chDestProxySources, queueProxySources, []byte(u)); err != nil {
+						app.loki.error(errors.WithStack(err))
+					}
+					addedURLs += 1
 				}
 			}
 		}
 
+		app.loki.info(fmt.Sprintf(`done in %s; processed "%s"; found/added: %d/%d proxies, %d/%d urls`, formatDuration(time.Now().Sub(startTime)), hPayload.FromURL, len(proxies), addedProxies, len(urls), addedURLs))
 		return nil
 	}
 
@@ -286,38 +333,42 @@ func processSourceHTML(rabbitConn *amqp.Connection, rdbForSites *redisDB, rdbFor
 	return nil
 }
 
-func processRawProxy(rabbitConn *amqp.Connection, postgresPool *pgxpool.Pool) error {
-	ch, err := rabbitConn.Channel()
+func processRawProxy(app App) error {
+	ch, err := app.rabbitConn.Channel()
 	if err != nil {
 		return err
 	}
-	defer ch.Close()
+	defer func(ch *amqp.Channel) {
+		if err := ch.Close(); err != nil {
+			app.loki.error(errors.WithStack(err))
+		}
+	}(ch)
 
 	handler := func(in []byte) error {
-		fmt.Println(time.Now().Format("2006-01-02T15:04:05"), "processRawProxy - start")
-		ts := time.Now()
-		defer func(ts time.Time) {
-			fmt.Println(time.Now().Format("2006-01-02T15:04:05"), "processRawProxy end", time.Now().Sub(ts))
-		}(ts)
+		startTime := time.Now()
 
-		pType, anonymous, err := checkProxy(string(in))
+		pURL := string(in)
+
+		pType, anonymous, err := checkProxy(pURL, app.conf.IPAPIURL)
 		if err != nil {
+			app.loki.info(fmt.Sprintf(`done in %s; discarded "%s"`, formatDuration(time.Now().Sub(startTime)), pURL))
 			return err
 		}
 
 		p := proxy{
-			URL:       string(in),
+			URL:       pURL,
 			Active:    true,
 			Type:      pType.verbose(),
 			Anonymous: anonymous,
-			Created:   ts,
-			LastCheck: ts,
+			Created:   startTime,
+			LastCheck: startTime,
 		}
 
-		if err := saveProxyToDB(postgresPool, p); err != nil {
+		if err := saveProxyToDB(app.postgresPool, p); err != nil {
 			return err
 		}
 
+		app.loki.info(fmt.Sprintf(`done in %s; added "%s"`, formatDuration(time.Now().Sub(startTime)), pURL))
 		return nil
 	}
 
@@ -328,20 +379,20 @@ func processRawProxy(rabbitConn *amqp.Connection, postgresPool *pgxpool.Pool) er
 	return nil
 }
 
-func fillCheckProxiesQueue(rabbitConn *amqp.Connection, postgresPool *pgxpool.Pool) error {
-	ch, err := rabbitConn.Channel()
+func fillCheckProxiesQueue(app App) error {
+	ch, err := app.rabbitConn.Channel()
 	if err != nil {
 		return err
 	}
-	defer ch.Close()
+	defer func(ch *amqp.Channel) {
+		if err := ch.Close(); err != nil {
+			app.loki.error(errors.WithStack(err))
+		}
+	}(ch)
 
-	fmt.Println(time.Now().Format("2006-01-02T15:04:05"), "fillCheckProxiesQueue - start")
-	ts := time.Now()
-	defer func(ts time.Time) {
-		fmt.Println(time.Now().Format("2006-01-02T15:04:05"), "fillCheckProxiesQueue end", time.Now().Sub(ts))
-	}(ts)
+	startTime := time.Now()
 
-	proxies, err := freshProxies(postgresPool, time.Hour*24)
+	proxies, err := freshProxies(app.postgresPool, time.Hour*24)
 	if err != nil {
 		return err
 	}
@@ -351,44 +402,48 @@ func fillCheckProxiesQueue(rabbitConn *amqp.Connection, postgresPool *pgxpool.Po
 		}
 	}
 
+	app.loki.info(fmt.Sprintf(`done in %s; added %d proxies`, formatDuration(time.Now().Sub(startTime)), len(proxies)))
 	return nil
 }
 
-func processCheckProxy(rabbitConn *amqp.Connection, postgresPool *pgxpool.Pool) error {
-	ch, err := rabbitConn.Channel()
+func processCheckProxy(app App) error {
+	ch, err := app.rabbitConn.Channel()
 	if err != nil {
 		return err
 	}
-	defer ch.Close()
+	defer func(ch *amqp.Channel) {
+		if err := ch.Close(); err != nil {
+			app.loki.error(errors.WithStack(err))
+		}
+	}(ch)
 
 	handler := func(in []byte) error {
-		fmt.Println(time.Now().Format("2006-01-02T15:04:05"), "processCheckProxy - start")
-		ts := time.Now()
-		defer func(ts time.Time) {
-			fmt.Println(time.Now().Format("2006-01-02T15:04:05"), "processCheckProxy end", time.Now().Sub(ts))
-		}(ts)
+		startTime := time.Now()
 
-		proxyURL := string(in)
+		pURL := string(in)
 
-		pType, anonymous, err := checkProxy(proxyURL)
+		pType, anonymous, err := checkProxy(pURL, app.conf.IPAPIURL)
 		if err != nil {
-			if err := changeProxyToInactive(postgresPool, proxyURL); err != nil {
+			if err := changeProxyToInactive(app.postgresPool, pURL); err != nil {
+				app.loki.error(errors.WithStack(err))
 			}
+			app.loki.info(fmt.Sprintf(`done in %s; changed to inactive "%s"`, formatDuration(time.Now().Sub(startTime)), pURL))
 			return err
 		}
 
 		p := proxy{
-			URL:       proxyURL,
+			URL:       pURL,
 			Active:    true,
 			Type:      pType.verbose(),
 			Anonymous: anonymous,
-			LastCheck: ts,
+			LastCheck: startTime,
 		}
 
-		if err := updateProxyInDB(postgresPool, p); err != nil {
+		if err := updateProxyInDB(app.postgresPool, p); err != nil {
 			return err
 		}
 
+		app.loki.info(fmt.Sprintf(`done in %s; updated last check (active) "%s"`, formatDuration(time.Now().Sub(startTime)), pURL))
 		return nil
 	}
 

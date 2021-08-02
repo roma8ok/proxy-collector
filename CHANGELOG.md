@@ -1,3 +1,7 @@
+### 0.0.13 - 2021.08.02
+
+- added logger
+
 ### 0.0.12 - 2021.08.01
 
 - added config file

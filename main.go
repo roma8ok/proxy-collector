@@ -8,75 +8,106 @@ import (
 	"io/ioutil"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/pkg/errors"
 	"github.com/streadway/amqp"
 )
 
 func main() {
-	var serviceFlags arrayFlags
-	flag.Var(&serviceFlags, "service", fmt.Sprintf("Select one of more services for activate.\nAvailable: %s, %s, %s, %s, %s, %s, %s, %s.", serviceFillSearchQueries, serviceSendSearchBodyFromDDGToQueue, serviceProcessSearchBodyFromDDG, serviceSendHTMLFromProxySourceToQueue, serviceProcessSourceHTML, serviceProcessRawProxy, serviceFillCheckProxiesQueue, serviceProcessCheckProxies))
+	services := []string{
+		serviceFillSearchQueries,
+		serviceSendSearchBodyFromDDGToQueue,
+		serviceProcessSearchBodyFromDDG,
+		serviceSendHTMLFromProxySourceToQueue,
+		serviceProcessSourceHTML,
+		serviceProcessRawProxy,
+		serviceFillCheckProxiesQueue,
+		serviceProcessCheckProxies,
+	}
+
 	configFlag := flag.String("config", "", "Select config .json file.")
+	serviceFlag := flag.String("service", "", fmt.Sprintf("Select one service for activate.\nAvailable: %s.", strings.Join(services, ", ")))
 	flag.Parse()
-	if len(serviceFlags) == 0 {
-		panic("Select one of more services for activate (flag -service)")
+	if *serviceFlag == "" || !isExist(*serviceFlag, services) {
+		_, _ = fmt.Fprintf(os.Stderr, "Select one service for activate (flag -service)\n")
+		os.Exit(1)
 	}
 	if *configFlag == "" {
-		panic("Select config file (flag -config)")
+		_, _ = fmt.Fprintf(os.Stderr, "Select config file (flag -config)\n")
+		os.Exit(1)
 	}
 
 	confData, err := ioutil.ReadFile(*configFlag)
 	if err != nil {
-		panic("Config file is wrong")
+		_, _ = fmt.Fprintf(os.Stderr, "Can't read config file\n")
+		os.Exit(1)
 	}
-	var conf config
+	var conf Config
 	if err := json.Unmarshal(confData, &conf); err != nil {
-		panic("Config file is wrong")
+		_, _ = fmt.Fprintf(os.Stderr, "Config file is wrong\n")
+		os.Exit(1)
+	}
+
+	loki, err := newLogger(conf.PromtailURL, createJobName(*serviceFlag))
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "Can't create logger\n")
+		os.Exit(1)
 	}
 
 	rabbitConn, err := amqp.Dial(conf.RabbitURL)
 	if err != nil {
-		panic(err)
+		loki.errorWithExit(errors.WithMessage(errors.WithStack(err), "Can't connect to rabbitMQ"))
 	}
 	defer func(conn *amqp.Connection) {
 		err := conn.Close()
 		if err != nil {
-			panic(err)
+			loki.errorWithExit(errors.WithMessage(errors.WithStack(err), "Can't close connection to rabbitMQ"))
 		}
 	}(rabbitConn)
 
 	queues := []string{queueSearchQueries, queueSearchBodiesFromDDG, queueProxySources, queueProxySourceHTML, queueRawProxies, queueCheckProxies}
 	if err := initQueues(rabbitConn, queues); err != nil {
-		panic(err)
+		loki.errorWithExit(errors.WithMessage(errors.WithStack(err), "Can't init queues"))
 	}
 
 	rdbForSites, err := newRedisDB(conf.RedisURLForSites)
 	if err != nil {
-		panic(err)
+		loki.errorWithExit(errors.WithMessage(errors.WithStack(err), "Can't connect to redis for site urls"))
 	}
 	rdbForProxies, err := newRedisDB(conf.RedisURLForProxies)
 	if err != nil {
-		panic(err)
+		loki.errorWithExit(errors.WithMessage(errors.WithStack(err), "Can't connect to redis for proxy urls"))
 	}
 
 	postgresPool, err := pgxpool.Connect(context.Background(), conf.PostgresURL)
 	if err != nil {
-		return
+		loki.errorWithExit(errors.WithMessage(errors.WithStack(err), "Can't connect to postgreSQL"))
 	}
 	defer postgresPool.Close()
+
+	app := App{
+		loki:          loki,
+		rabbitConn:    rabbitConn,
+		postgresPool:  postgresPool,
+		rdbForSites:   rdbForSites,
+		rdbForProxies: rdbForProxies,
+		conf:          conf,
+	}
 
 	exit := make(chan os.Signal, 1)
 	signal.Notify(exit, syscall.SIGINT, syscall.SIGTERM)
 
-	if isExist(serviceFillSearchQueries, serviceFlags) {
-		fmt.Printf("Start worker for %s\n", serviceFillSearchQueries)
+	if *serviceFlag == serviceFillSearchQueries {
+		loki.info("worker started")
 		go func() {
 			fromProxies := false
 			for {
-				if err := fillSearchQueries(rabbitConn, postgresPool, fromProxies); err != nil {
-					panic(err)
+				if err := fillSearchQueries(app, fromProxies); err != nil {
+					loki.errorWithExit(errors.WithStack(err))
 				}
 				fromProxies = !fromProxies
 				time.Sleep(time.Minute)
@@ -84,68 +115,68 @@ func main() {
 		}()
 	}
 
-	if isExist(serviceSendSearchBodyFromDDGToQueue, serviceFlags) {
-		fmt.Printf("Start worker for %s\n", serviceSendSearchBodyFromDDGToQueue)
+	if *serviceFlag == serviceSendSearchBodyFromDDGToQueue {
+		loki.info("worker started")
 		go func() {
-			if err := sendSearchBodyFromDDGToQueue(rabbitConn, proxyURL, userAgent); err != nil {
-				panic(err)
+			if err := sendSearchBodyFromDDGToQueue(app, proxyURL, userAgent); err != nil {
+				loki.errorWithExit(errors.WithStack(err))
 			}
 		}()
 	}
 
-	if isExist(serviceProcessSearchBodyFromDDG, serviceFlags) {
-		fmt.Printf("Start worker for %s\n", serviceProcessSearchBodyFromDDG)
+	if *serviceFlag == serviceProcessSearchBodyFromDDG {
+		loki.info("worker started")
 		go func() {
-			if err := processSearchBodyFromDDG(rabbitConn, rdbForSites); err != nil {
-				panic(err)
+			if err := processSearchBodyFromDDG(app); err != nil {
+				loki.errorWithExit(errors.WithStack(err))
 			}
 		}()
 	}
 
-	if isExist(serviceSendHTMLFromProxySourceToQueue, serviceFlags) {
-		fmt.Printf("Start worker for %s\n", serviceSendHTMLFromProxySourceToQueue)
+	if *serviceFlag == serviceSendHTMLFromProxySourceToQueue {
+		loki.info("worker started")
 		go func() {
-			if err := sendHTMLFromProxySourceToQueue(rabbitConn); err != nil {
-				panic(err)
+			if err := sendHTMLFromProxySourceToQueue(app); err != nil {
+				loki.errorWithExit(errors.WithStack(err))
 			}
 		}()
 	}
 
-	if isExist(serviceProcessSourceHTML, serviceFlags) {
-		fmt.Printf("Start worker for %s\n", serviceProcessSourceHTML)
+	if *serviceFlag == serviceProcessSourceHTML {
+		loki.info("worker started")
 		go func() {
-			if err := processSourceHTML(rabbitConn, rdbForSites, rdbForProxies, postgresPool); err != nil {
-				panic(err)
+			if err := processSourceHTML(app); err != nil {
+				loki.errorWithExit(errors.WithStack(err))
 			}
 		}()
 	}
 
-	if isExist(serviceProcessRawProxy, serviceFlags) {
-		fmt.Printf("Start worker for %s\n", serviceProcessRawProxy)
+	if *serviceFlag == serviceProcessRawProxy {
+		loki.info("worker started")
 		go func() {
-			if err := processRawProxy(rabbitConn, postgresPool); err != nil {
-				panic(err)
+			if err := processRawProxy(app); err != nil {
+				loki.errorWithExit(errors.WithStack(err))
 			}
 		}()
 	}
 
-	if isExist(serviceFillCheckProxiesQueue, serviceFlags) {
-		fmt.Printf("Start worker for %s\n", serviceFillCheckProxiesQueue)
+	if *serviceFlag == serviceFillCheckProxiesQueue {
+		loki.info("worker started")
 		go func() {
 			for {
-				if err := fillCheckProxiesQueue(rabbitConn, postgresPool); err != nil {
-					panic(err)
+				if err := fillCheckProxiesQueue(app); err != nil {
+					loki.errorWithExit(errors.WithStack(err))
 				}
-				time.Sleep(time.Minute)
+				time.Sleep(time.Minute * 10)
 			}
 		}()
 	}
 
-	if isExist(serviceProcessCheckProxies, serviceFlags) {
-		fmt.Printf("Start worker for %s\n", serviceProcessCheckProxies)
+	if *serviceFlag == serviceProcessCheckProxies {
+		loki.info("worker started")
 		go func() {
-			if err := processCheckProxy(rabbitConn, postgresPool); err != nil {
-				panic(err)
+			if err := processCheckProxy(app); err != nil {
+				loki.errorWithExit(errors.WithStack(err))
 			}
 		}()
 	}

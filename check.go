@@ -60,7 +60,7 @@ func connectToProxy(p string) error {
 	return err
 }
 
-func sendHTTPCheckRequest(p string) (ip string, err error) {
+func sendHTTPCheckRequest(p, ipAPIURL string) (ip string, err error) {
 	proxyURL, err := url.Parse(p)
 	if err != nil {
 		return
@@ -92,7 +92,7 @@ func sendHTTPCheckRequest(p string) (ip string, err error) {
 	return
 }
 
-func sendSOCKSCheckRequest(p string) (ip string, err error) {
+func sendSOCKSCheckRequest(ipAPIURL, p string) (ip string, err error) {
 	d := net.Dialer{
 		Timeout:   requestTimeout,
 		KeepAlive: requestTimeout,
@@ -127,7 +127,7 @@ func sendSOCKSCheckRequest(p string) (ip string, err error) {
 	return
 }
 
-func externalIP() (string, error) {
+func externalIP(ipAPIURL string) (string, error) {
 	tr := &http.Transport{
 		DisableKeepAlives: true,
 		TLSClientConfig:   &tls.Config{InsecureSkipVerify: true},
@@ -152,23 +152,23 @@ func externalIP() (string, error) {
 	return string(ip), nil
 }
 
-func checkProxy(p string) (pType proxyType, anonymous bool, err error) {
+func checkProxy(p, ipAPIURL string) (pType proxyType, anonymous bool, err error) {
 	if err := connectToProxy(p); err != nil {
 		return 0, false, err
 	}
 
-	extIP, err := externalIP()
+	extIP, err := externalIP(ipAPIURL)
 	if err != nil {
 		return 0, false, err
 	}
 
-	if ip, err := sendHTTPCheckRequest("http://" + p); err == nil {
+	if ip, err := sendHTTPCheckRequest("http://"+p, ipAPIURL); err == nil {
 		return proxyTypeHTTP, extIP != ip, nil
 	}
-	if ip, err := sendHTTPCheckRequest("https://" + p); err == nil {
+	if ip, err := sendHTTPCheckRequest("https://"+p, ipAPIURL); err == nil {
 		return proxyTypeHTTPS, extIP != ip, nil
 	}
-	if ip, err := sendSOCKSCheckRequest("socks://" + p); err == nil {
+	if ip, err := sendSOCKSCheckRequest("socks://"+p, ipAPIURL); err == nil {
 		return proxyTypeSOCKS, extIP != ip, nil
 	}
 
