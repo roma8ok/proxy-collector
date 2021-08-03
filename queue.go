@@ -19,7 +19,7 @@ func initQueues(conn *amqp.Connection, queues []string) error {
 	for _, q := range queues {
 		if _, err := ch.QueueDeclare(
 			q,
-			false,
+			true,
 			false,
 			false,
 			false,
