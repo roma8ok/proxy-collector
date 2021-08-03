@@ -33,6 +33,8 @@ func fillSearchQueries(app App, fromProxies bool) error {
 			for _, fProxy := range freshProxyList {
 				proxies = append(proxies, fProxy.URL)
 			}
+		} else {
+			app.loki.error(errors.WithStack(err))
 		}
 	}
 
@@ -101,6 +103,7 @@ func sendSearchBodyFromDDGToQueue(app App, proxyURL, userAgent string) error {
 		}
 
 		if err := publish(chDest, queueSearchBodiesFromDDG, body); err != nil {
+			app.loki.error(errors.WithStack(err))
 			return err
 		}
 
@@ -144,11 +147,13 @@ func processSearchBodyFromDDG(app App) error {
 		for _, u := range urls {
 			changeType, err := app.rdbForSites.set(u)
 			if err != nil {
+				app.loki.error(errors.WithStack(err))
 				return err
 			}
 			switch changeType {
 			case redisChangeAdd, redisChangeUpdate:
 				if err := publish(chDest, queueProxySources, []byte(u)); err != nil {
+					app.loki.error(errors.WithStack(err))
 					return err
 				}
 				addedUrls += 1
@@ -223,7 +228,7 @@ func sendHTMLFromProxySourceToQueue(app App) error {
 		}
 
 		if err := publish(chDest, queueProxySourceHTML, hPayloadJSON); err != nil {
-			return err
+			app.loki.error(errors.WithStack(err))
 		}
 
 		app.loki.info(fmt.Sprintf(`done in %s; added body from "%s"`, formatDuration(time.Now().Sub(startTime)), u))
@@ -278,6 +283,7 @@ func processSourceHTML(app App) error {
 
 		var hPayload htmlPayload
 		if err := json.Unmarshal(in, &hPayload); err != nil {
+			app.loki.error(errors.WithStack(err))
 			return err
 		}
 
@@ -286,12 +292,14 @@ func processSourceHTML(app App) error {
 		for _, p := range proxies {
 			changeType, err := app.rdbForProxies.set(p)
 			if err != nil {
+				app.loki.error(errors.WithStack(err))
 				return err
 			}
 			switch changeType {
 			case redisChangeAdd, redisChangeUpdate:
 				if err := publish(chDestRawProxies, queueRawProxies, []byte(p)); err != nil {
 					app.loki.error(errors.WithStack(err))
+					return err
 				}
 				addedProxies += 1
 			}
@@ -310,12 +318,14 @@ func processSourceHTML(app App) error {
 
 				changeType, err := app.rdbForSites.set(u)
 				if err != nil {
+					app.loki.error(errors.WithStack(err))
 					return err
 				}
 				switch changeType {
 				case redisChangeAdd, redisChangeUpdate:
 					if err := publish(chDestProxySources, queueProxySources, []byte(u)); err != nil {
 						app.loki.error(errors.WithStack(err))
+						return err
 					}
 					addedURLs += 1
 				}
@@ -365,6 +375,7 @@ func processRawProxy(app App) error {
 		}
 
 		if err := saveProxyToDB(app.postgresPool, p); err != nil {
+			app.loki.error(errors.WithStack(err))
 			return err
 		}
 
@@ -426,6 +437,7 @@ func processCheckProxy(app App) error {
 		if err != nil {
 			if err := changeProxyToInactive(app.postgresPool, pURL); err != nil {
 				app.loki.error(errors.WithStack(err))
+				return err
 			}
 			app.loki.info(fmt.Sprintf(`done in %s; changed to inactive "%s"`, formatDuration(time.Now().Sub(startTime)), pURL))
 			return err
@@ -440,6 +452,7 @@ func processCheckProxy(app App) error {
 		}
 
 		if err := updateProxyInDB(app.postgresPool, p); err != nil {
+			app.loki.error(errors.WithStack(err))
 			return err
 		}
 

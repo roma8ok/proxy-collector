@@ -1,3 +1,7 @@
+### 0.0.14 - in progress
+
+- added error logs
+
 ### 0.0.13 - 2021.08.02
 
 - added logger
