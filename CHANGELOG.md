@@ -1,8 +1,9 @@
-### 0.0.14 - in progress
+### 0.1.0 - 2021.08.04
 
 - added error logs
 - changed queues durable to true
 - added reconnect to rabbitMQ
+- updated readme
 
 ### 0.0.13 - 2021.08.02
 
