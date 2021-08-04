@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v4/pgxpool"
-	"github.com/streadway/amqp"
 )
 
 const (
@@ -19,6 +18,11 @@ const (
 	queueProxySourceHTML     = "4_proxy_source_html"
 	queueRawProxies          = "5_raw_proxies"
 	queueCheckProxies        = "6_check_proxies"
+
+	rabbitMQReconnectDelay     = 30 * time.Second // When reconnecting to the server after connection failure
+	rabbitMQReInitDelay        = 30 * time.Second // When setting up the channel after a channel exception
+	rabbitMQResendDelay        = 10 * time.Second // When resending messages the server didn't confirm
+	rabbitMQRecheckStreamDelay = 10 * time.Second
 
 	redisExpiration = time.Hour * 24
 
@@ -45,7 +49,6 @@ type Config struct {
 
 type App struct {
 	loki          Logger
-	rabbitConn    *amqp.Connection
 	postgresPool  *pgxpool.Pool
 	rdbForSites   *redisDB
 	rdbForProxies *redisDB

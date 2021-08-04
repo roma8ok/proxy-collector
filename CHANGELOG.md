@@ -2,6 +2,7 @@
 
 - added error logs
 - changed queues durable to true
+- added reconnect to rabbitMQ
 
 ### 0.0.13 - 2021.08.02
 

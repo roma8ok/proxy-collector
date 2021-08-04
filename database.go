@@ -16,19 +16,19 @@ const (
 func blacklistDomains(pool *pgxpool.Pool) (domains []string, err error) {
 	s, _, err := sq.Select("domain").From(tableBlacklistDomains).ToSql()
 	if err != nil {
-		return nil, err
+		return domains, err
 	}
 
 	rows, err := pool.Query(context.Background(), s)
 	if rows != nil {
 		if err := rows.Err(); err != nil {
-			return nil, err
+			return domains, err
 		}
 
 		for rows.Next() {
 			var d string
 			if err := rows.Scan(&d); err != nil {
-				return nil, err
+				return domains, err
 			}
 			domains = append(domains, d)
 		}

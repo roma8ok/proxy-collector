@@ -35,8 +35,12 @@ func newLogger(promtailURL, jobName string) (Logger, error) {
 	}, nil
 }
 
+func (l *Logger) debug(message string) {
+	l.client.Debugf("%s - %s", l.jobName, message)
+}
+
 func (l *Logger) info(message string) {
-	l.client.Infof("%s - %s", l.jobName, message)
+	l.client.Infof(" %s - %s", l.jobName, message)
 }
 
 func (l *Logger) error(err error) {
