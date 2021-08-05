@@ -246,7 +246,7 @@ func processRawProxy(app App, queueSource *RabbitMQSession) {
 			return false
 		}
 
-		p := proxy{
+		p := Proxy{
 			URL:       pURL,
 			Active:    true,
 			Type:      pType.verbose(),
@@ -300,7 +300,7 @@ func processCheckProxy(app App, queueSource *RabbitMQSession) {
 			return false
 		}
 
-		p := proxy{
+		p := Proxy{
 			URL:       pURL,
 			Active:    true,
 			Type:      pType.verbose(),

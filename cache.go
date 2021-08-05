@@ -7,16 +7,17 @@ import (
 	"github.com/go-redis/redis/v8"
 )
 
-type redisDB struct {
+type RedisDB struct {
 	client *redis.Client
 }
 
-func newRedisDB(connectURL string) (*redisDB, error) {
+// newRedisDB creates new RedisDB.
+func newRedisDB(connectURL string) (*RedisDB, error) {
 	opt, err := redis.ParseURL(connectURL)
 	if err != nil {
 		return nil, err
 	}
-	rdb := &redisDB{
+	rdb := &RedisDB{
 		client: redis.NewClient(opt),
 	}
 	return rdb, nil
@@ -31,7 +32,12 @@ const (
 	redisChangeErr
 )
 
-func (rdb *redisDB) set(key string) (redisChangeType, error) {
+// set, depending on key and its value, creates, updates or does nothing with the key and value.
+// Value is always timestamp when key was created or updated. Format in RFC3339.
+// If key does not exist key is created with value is current timestamp.
+// If key exists and key has not expired, nothing happens.
+// If key exists and key has expired, value of key is updated to current timestamp.
+func (rdb *RedisDB) set(key string) (redisChangeType, error) {
 	tsNow := time.Now()
 	tsNowRFC3339 := tsNow.Format(time.RFC3339)
 	ctx := context.Background()

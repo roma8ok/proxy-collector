@@ -1,3 +1,9 @@
+## 0.1.1 - 2021.08.06
+
+- updated readme
+- added comments
+- refactored
+
 ### 0.1.0 - 2021.08.04
 
 - added error logs

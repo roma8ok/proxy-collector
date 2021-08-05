@@ -12,15 +12,16 @@ import (
 	netProxy "golang.org/x/net/proxy"
 )
 
-type proxyType int
+type ProxyType int
 
 const (
-	proxyTypeHTTP proxyType = iota
+	proxyTypeHTTP ProxyType = iota
 	proxyTypeHTTPS
 	proxyTypeSOCKS
 )
 
-func (t *proxyType) verbose() string {
+// verbose converts ProxyType int to verbose string.
+func (t *ProxyType) verbose() string {
 	switch *t {
 	case proxyTypeHTTP:
 		return "http"
@@ -32,6 +33,7 @@ func (t *proxyType) verbose() string {
 	return ""
 }
 
+// possibleForProxySourceURL checks proxy url for being a proxy.
 func possibleForProxySourceURL(u string, forbiddenDomains []string) bool {
 	uParsed, err := url.Parse(u)
 	if err != nil {
@@ -152,7 +154,7 @@ func externalIP(ipAPIURL string) (string, error) {
 	return string(ip), nil
 }
 
-func checkProxy(p, ipAPIURL string) (pType proxyType, anonymous bool, err error) {
+func checkProxy(p, ipAPIURL string) (pType ProxyType, anonymous bool, err error) {
 	if err := connectToProxy(p); err != nil {
 		return 0, false, err
 	}
