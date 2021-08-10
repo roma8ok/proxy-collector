@@ -28,6 +28,8 @@ Some services for searching, checking and saving proxies from the WEB.
 
 2. Create config file config-prod.json similar to config-develop.json.
 
+- In `ip_api_url` you can use `https://public-ip.dev/`, `https://api64.ipify.org/` or other similar services.
+
 3. Start services (workers number is recommended for AWS t4g.micro). It is recommended to start services at the same
    time or in reverse order.
 

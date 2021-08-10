@@ -2,6 +2,7 @@
 
 - added advanced config to rabbitMQ
 - updated service exit channel
+- ip_api_url changed
 
 ## 0.1.1 - 2021.08.06
 
