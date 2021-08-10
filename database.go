@@ -8,40 +8,15 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 )
 
-const (
-	tableBlacklistDomains = "blacklist_domains"
-	tableProxies          = "proxies"
-)
-
-func blacklistDomains(pool *pgxpool.Pool) (domains []string, err error) {
-	s, _, err := sq.Select("domain").From(tableBlacklistDomains).ToSql()
-	if err != nil {
-		return domains, err
-	}
-
-	rows, err := pool.Query(context.Background(), s)
-	if rows != nil {
-		if err := rows.Err(); err != nil {
-			return domains, err
-		}
-
-		for rows.Next() {
-			var d string
-			if err := rows.Scan(&d); err != nil {
-				return domains, err
-			}
-			domains = append(domains, d)
-		}
-	}
-
-	return domains, nil
-}
+const tableProxies = "proxies"
 
 type Proxy struct {
 	ID        int
 	Active    bool
 	URL       string
-	Type      string
+	HTTP      bool
+	HTTPS     bool
+	SOCKS5    bool
 	Anonymous bool
 	Created   time.Time
 	LastCheck time.Time
@@ -70,8 +45,8 @@ func proxyExistInDB(pool *pgxpool.Pool, u string) bool {
 func insertProxyIntoDB(pool *pgxpool.Pool, p Proxy) error {
 	s, args, err := sq.
 		Insert(tableProxies).
-		Columns("url", "active", "type", "anonymous", "created", "last_check").
-		Values(p.URL, p.Active, p.Type, p.Anonymous, p.Created, p.LastCheck).
+		Columns("url", "active", "http", "https", "socks5", "anonymous", "created", "last_check").
+		Values(p.URL, p.Active, p.HTTP, p.HTTPS, p.SOCKS5, p.Anonymous, p.Created, p.LastCheck).
 		PlaceholderFormat(sq.Dollar).
 		ToSql()
 	if err != nil {
@@ -91,7 +66,9 @@ func updateProxyInDB(pool *pgxpool.Pool, p Proxy) error {
 		Update("proxies").
 		Where(sq.Eq{"url": p.URL}).
 		Set("active", p.Active).
-		Set("type", p.Type).
+		Set("http", p.HTTP).
+		Set("https", p.HTTPS).
+		Set("socks5", p.SOCKS5).
 		Set("anonymous", p.Anonymous).
 		Set("last_check", p.LastCheck).
 		PlaceholderFormat(sq.Dollar).
@@ -145,7 +122,7 @@ func changeProxyToInactive(pool *pgxpool.Pool, pURL string) error {
 }
 
 func freshProxies(pool *pgxpool.Pool, duration time.Duration) (proxies []Proxy, err error) {
-	s, args, err := sq.Select("id", "url", "active", "type", "anonymous", "created", "last_check").
+	s, args, err := sq.Select("id", "url", "active", "http", "https", "socks5", "anonymous", "created", "last_check").
 		From(tableProxies).
 		Where(sq.GtOrEq{"last_check": time.Now().Add(-1 * duration)}).
 		PlaceholderFormat(sq.Dollar).
@@ -162,7 +139,7 @@ func freshProxies(pool *pgxpool.Pool, duration time.Duration) (proxies []Proxy, 
 
 		for rows.Next() {
 			var p Proxy
-			if err := rows.Scan(&p.ID, &p.URL, &p.Active, &p.Type, &p.Anonymous, &p.Created, &p.LastCheck); err != nil {
+			if err := rows.Scan(&p.ID, &p.URL, &p.Active, &p.HTTP, &p.HTTPS, &p.SOCKS5, &p.Anonymous, &p.Created, &p.LastCheck); err != nil {
 				return nil, err
 			}
 			proxies = append(proxies, p)
@@ -173,7 +150,7 @@ func freshProxies(pool *pgxpool.Pool, duration time.Duration) (proxies []Proxy, 
 }
 
 func proxiesFromDB(pool *pgxpool.Pool, active bool) (proxies []Proxy, err error) {
-	s, args, err := sq.Select("id", "url", "active", "type", "anonymous", "created", "last_check").
+	s, args, err := sq.Select("id", "url", "active", "http", "https", "socks5", "anonymous", "created", "last_check").
 		From(tableProxies).
 		Where(sq.Eq{"active": active}).
 		PlaceholderFormat(sq.Dollar).
@@ -190,7 +167,7 @@ func proxiesFromDB(pool *pgxpool.Pool, active bool) (proxies []Proxy, err error)
 
 		for rows.Next() {
 			var p Proxy
-			if err := rows.Scan(&p.ID, &p.URL, &p.Active, &p.Type, &p.Anonymous, &p.Created, &p.LastCheck); err != nil {
+			if err := rows.Scan(&p.ID, &p.URL, &p.Active, &p.HTTP, &p.HTTPS, &p.SOCKS5, &p.Anonymous, &p.Created, &p.LastCheck); err != nil {
 				return nil, err
 			}
 			proxies = append(proxies, p)

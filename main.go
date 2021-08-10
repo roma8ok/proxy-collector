@@ -76,12 +76,18 @@ func main() {
 	}
 	defer postgresPool.Close()
 
+	hostExtIP, err := externalIP(conf.IPAPIURL)
+	if err != nil {
+		loki.errorWithExit(errors.WithMessage(errors.WithStack(err), fmt.Sprintf(`Can't get host external IP from "%s"`, conf.IPAPIURL)))
+	}
+
 	app := App{
 		loki:          loki,
 		postgresPool:  postgresPool,
 		rdbForSites:   rdbForSites,
 		rdbForProxies: rdbForProxies,
 		conf:          conf,
+		hostExtIP:     hostExtIP,
 	}
 
 	for i := 0; i < *workersFlag; i++ {

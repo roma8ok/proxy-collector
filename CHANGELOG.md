@@ -1,8 +1,9 @@
-## 0.1.2 - in progress
+## 0.2.0 (release) - 2021.08.10
 
 - added advanced config to rabbitMQ
 - updated service exit channel
 - ip_api_url changed
+- updated checkProxy
 
 ## 0.1.1 - 2021.08.06
 
@@ -10,7 +11,7 @@
 - added comments
 - refactored
 
-### 0.1.0 - 2021.08.04
+### 0.1.0 (release) - 2021.08.04
 
 - added error logs
 - changed queues durable to true

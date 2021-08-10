@@ -58,4 +58,5 @@ type App struct {
 	rdbForSites   *RedisDB
 	rdbForProxies *RedisDB
 	conf          Config
+	hostExtIP     string // external IP of the host
 }

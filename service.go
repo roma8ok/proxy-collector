@@ -168,11 +168,6 @@ func sendHTMLFromProxySourceToQueue(app App, queueSource, queueDest *RabbitMQSes
 }
 
 func processSourceHTML(app App, queueSource, queueDestRawProxies, queueDestProxySources *RabbitMQSession) {
-	forbiddenDomains, err := blacklistDomains(app.postgresPool)
-	if err != nil {
-		app.loki.error(errors.WithStack(err))
-	}
-
 	var handler RabbitMQStreamHandler = func(in []byte) (ack bool) {
 		startTime := time.Now()
 
@@ -207,7 +202,7 @@ func processSourceHTML(app App, queueSource, queueDestRawProxies, queueDestProxy
 				if !urlsHaveSameDomain(hPayload.FromURL, u) {
 					continue
 				}
-				if !possibleForProxySourceURL(u, forbiddenDomains) {
+				if !possibleForProxySourceURL(u) {
 					continue
 				}
 
@@ -240,20 +235,13 @@ func processRawProxy(app App, queueSource *RabbitMQSession) {
 
 		pURL := string(in)
 
-		pType, anonymous, err := checkProxy(pURL, app.conf.IPAPIURL)
+		p, err := checkProxy(pURL, app.hostExtIP, app.conf.IPAPIURL)
 		if err != nil {
 			app.loki.info(fmt.Sprintf(`Done in %s; discarded "%s"`, formatDuration(time.Now().Sub(startTime)), pURL))
 			return false
 		}
-
-		p := Proxy{
-			URL:       pURL,
-			Active:    true,
-			Type:      pType.verbose(),
-			Anonymous: anonymous,
-			Created:   startTime,
-			LastCheck: startTime,
-		}
+		p.Created = startTime
+		p.LastCheck = startTime
 
 		if err := saveProxyToDB(app.postgresPool, p); err != nil {
 			app.loki.error(errors.WithStack(err))
@@ -290,23 +278,17 @@ func processCheckProxy(app App, queueSource *RabbitMQSession) {
 
 		pURL := string(in)
 
-		pType, anonymous, err := checkProxy(pURL, app.conf.IPAPIURL)
+		p, err := checkProxy(pURL, app.hostExtIP, app.conf.IPAPIURL)
 		if err != nil {
 			if err := changeProxyToInactive(app.postgresPool, pURL); err != nil {
 				app.loki.error(errors.WithStack(err))
 				return false
 			}
-			app.loki.info(fmt.Sprintf(`Done in %s; changed to inactive "%s"`, formatDuration(time.Now().Sub(startTime)), pURL))
+			app.loki.info(fmt.Sprintf(`Done in %s; proxy is inactive "%s"`, formatDuration(time.Now().Sub(startTime)), pURL))
 			return false
 		}
 
-		p := Proxy{
-			URL:       pURL,
-			Active:    true,
-			Type:      pType.verbose(),
-			Anonymous: anonymous,
-			LastCheck: startTime,
-		}
+		p.LastCheck = startTime
 
 		if err := updateProxyInDB(app.postgresPool, p); err != nil {
 			app.loki.error(errors.WithStack(err))

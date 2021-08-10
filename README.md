@@ -1,13 +1,13 @@
-## Proxy-collector
+# Proxy-collector
 
 Some services for searching, checking and saving proxies from the WEB.
 
-### How it works?
+## How it works?
 
 1. Start external and proxy-collector services.
 2. Get proxies in postgreSQL in table `proxies`. These proxies are fresh because they are checked every 10 minutes.
 
-### Production
+## Production
 
 1. Start external services:
 
@@ -52,7 +52,7 @@ Some services for searching, checking and saving proxies from the WEB.
 |5_raw_proxies           |processRawProxy               |processSourceHTML                          |
 |6_check_proxies         |processCheckProxies           |fillCheckProxiesQueue                      |
 
-### Local development
+## Local development
 
 1. Start external services:
 

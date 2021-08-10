@@ -8,8 +8,6 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
-
-	netProxy "golang.org/x/net/proxy"
 )
 
 type ProxyType int
@@ -20,27 +18,16 @@ const (
 	proxyTypeSOCKS
 )
 
-// verbose converts ProxyType int to verbose string.
-func (t *ProxyType) verbose() string {
-	switch *t {
-	case proxyTypeHTTP:
-		return "http"
-	case proxyTypeHTTPS:
-		return "https"
-	case proxyTypeSOCKS:
-		return "socks"
-	}
-	return ""
+type CheckPayload struct {
+	success bool
+	pType   ProxyType
+	ip      string
 }
 
 // possibleForProxySourceURL checks proxy url for being a proxy.
-func possibleForProxySourceURL(u string, forbiddenDomains []string) bool {
+func possibleForProxySourceURL(u string) bool {
 	uParsed, err := url.Parse(u)
 	if err != nil {
-		return false
-	}
-
-	if isExist(uParsed.Hostname(), forbiddenDomains) {
 		return false
 	}
 
@@ -54,7 +41,9 @@ func possibleForProxySourceURL(u string, forbiddenDomains []string) bool {
 	return true
 }
 
-func connectToProxy(p string) error {
+// checkTCPAddress tries to connect to tcp address.
+// checkTCPAddress returns an error if the attempt is failed.
+func checkTCPAddress(p string) error {
 	conn, err := net.DialTimeout("tcp", p, requestTimeout)
 	if err == nil {
 		conn.Close()
@@ -62,8 +51,10 @@ func connectToProxy(p string) error {
 	return err
 }
 
-func sendHTTPCheckRequest(p, ipAPIURL string) (ip string, err error) {
-	proxyURL, err := url.Parse(p)
+// sendProxyCheckRequest sends GET HTTP request to ipAPIURL through a proxy.
+// sendProxyCheckRequest returns IP from ipAPIURL and an error.
+func sendProxyCheckRequest(proxy, ipAPIURL string) (ip string, err error) {
+	proxyURL, err := url.Parse(proxy)
 	if err != nil {
 		return
 	}
@@ -94,41 +85,8 @@ func sendHTTPCheckRequest(p, ipAPIURL string) (ip string, err error) {
 	return
 }
 
-func sendSOCKSCheckRequest(ipAPIURL, p string) (ip string, err error) {
-	d := net.Dialer{
-		Timeout:   requestTimeout,
-		KeepAlive: requestTimeout,
-	}
-
-	dialer, err := netProxy.SOCKS5("tcp", p, nil, &d)
-	if err != nil {
-		return
-	}
-
-	client := &http.Client{
-		Timeout: requestTimeout,
-		Transport: &http.Transport{
-			DisableKeepAlives: true,
-			Dial:              dialer.Dial,
-			TLSClientConfig:   &tls.Config{InsecureSkipVerify: true},
-		},
-	}
-	res, err := client.Get(ipAPIURL)
-	if err != nil {
-		return
-	}
-
-	defer res.Body.Close()
-
-	ipBytes, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		return
-	}
-
-	ip = string(ipBytes)
-	return
-}
-
+// externalIP sends GET HTTP request to ipAPIURL.
+// externalIP returns IP from ipAPIURL and an error.
 func externalIP(ipAPIURL string) (string, error) {
 	tr := &http.Transport{
 		DisableKeepAlives: true,
@@ -154,25 +112,98 @@ func externalIP(ipAPIURL string) (string, error) {
 	return string(ip), nil
 }
 
-func checkProxy(p, ipAPIURL string) (pType ProxyType, anonymous bool, err error) {
-	if err := connectToProxy(p); err != nil {
-		return 0, false, err
+// checkProxy sends some HTTP requests to find out if the pHostPort is a proxy.
+// checkProxy returns Proxy and an error if pHostPort is not proxy.
+func checkProxy(pHostPort, hostExtIP, ipAPIURL string) (p Proxy, err error) {
+	if err := checkTCPAddress(pHostPort); err != nil {
+		return p, err
 	}
 
-	extIP, err := externalIP(ipAPIURL)
-	if err != nil {
-		return 0, false, err
+	ch := make(chan CheckPayload)
+
+	go func() {
+		ip, err := sendProxyCheckRequest("http://"+pHostPort, ipAPIURL)
+		if err != nil {
+			ch <- CheckPayload{
+				success: false,
+				pType:   proxyTypeHTTP,
+				ip:      "",
+			}
+		} else {
+			ch <- CheckPayload{
+				success: true,
+				pType:   proxyTypeHTTP,
+				ip:      ip,
+			}
+		}
+	}()
+
+	go func() {
+		ip, err := sendProxyCheckRequest("https://"+pHostPort, ipAPIURL)
+		if err != nil {
+			ch <- CheckPayload{
+				success: false,
+				pType:   proxyTypeHTTPS,
+				ip:      "",
+			}
+		} else {
+			ch <- CheckPayload{
+				success: true,
+				pType:   proxyTypeHTTPS,
+				ip:      ip,
+			}
+		}
+	}()
+
+	go func() {
+		ip, err := sendProxyCheckRequest("socks5://"+pHostPort, ipAPIURL)
+		if err != nil {
+			ch <- CheckPayload{
+				success: false,
+				pType:   proxyTypeSOCKS,
+				ip:      "",
+			}
+		} else {
+			ch <- CheckPayload{
+				success: true,
+				pType:   proxyTypeSOCKS,
+				ip:      ip,
+			}
+		}
+	}()
+
+	p1, p2, p3 := <-ch, <-ch, <-ch
+
+	successCounter := 0
+	anonymousCounter := 0
+	for _, cPayload := range []CheckPayload{p1, p2, p3} {
+		if !cPayload.success {
+			continue
+		}
+		successCounter += 1
+
+		switch cPayload.pType {
+		case proxyTypeHTTP:
+			p.HTTP = true
+		case proxyTypeHTTPS:
+			p.HTTPS = true
+		case proxyTypeSOCKS:
+			p.SOCKS5 = true
+		}
+
+		if hostExtIP != cPayload.ip {
+			anonymousCounter += 1
+		}
 	}
 
-	if ip, err := sendHTTPCheckRequest("http://"+p, ipAPIURL); err == nil {
-		return proxyTypeHTTP, extIP != ip, nil
+	p.URL = pHostPort
+	if successCounter > 0 && successCounter == anonymousCounter {
+		p.Anonymous = true
 	}
-	if ip, err := sendHTTPCheckRequest("https://"+p, ipAPIURL); err == nil {
-		return proxyTypeHTTPS, extIP != ip, nil
-	}
-	if ip, err := sendSOCKSCheckRequest("socks://"+p, ipAPIURL); err == nil {
-		return proxyTypeSOCKS, extIP != ip, nil
+	if successCounter > 0 {
+		p.Active = true
+		return p, nil
 	}
 
-	return 0, false, errors.New("checkProxy error")
+	return p, errors.New("checkProxy error")
 }
