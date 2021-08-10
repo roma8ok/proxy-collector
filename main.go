@@ -17,6 +17,9 @@ import (
 )
 
 func main() {
+	exit := make(chan os.Signal, 1)
+	signal.Notify(exit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)
+
 	services := []string{
 		serviceFillSearchQueries,
 		serviceSendSearchBodyFromDDGToQueue,
@@ -80,9 +83,6 @@ func main() {
 		rdbForProxies: rdbForProxies,
 		conf:          conf,
 	}
-
-	exit := make(chan os.Signal, 1)
-	signal.Notify(exit, syscall.SIGINT, syscall.SIGTERM)
 
 	for i := 0; i < *workersFlag; i++ {
 		loki.info(fmt.Sprintf("Service started (worker %d)", i))
