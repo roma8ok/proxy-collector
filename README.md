@@ -11,7 +11,16 @@ Some services for searching, checking and saving proxies from the WEB.
 
 1. Start external services:
 
-- rabbitMQ.
+- rabbitMQ. Add this to advanced.config:
+
+```
+[
+  {rabbit, [
+    {consumer_timeout, undefined}
+  ]}
+].
+```
+
 - redis for collecting sites.
 - redis for collecting proxies.
 - postgreSQL (within migrations).
@@ -46,7 +55,7 @@ Some services for searching, checking and saving proxies from the WEB.
 1. Start external services:
 
 - rabbitMQ:
-  `docker run --name proxy-collector-rabbit -d -p 15672:15672 -p 5672:5672 -e RABBITMQ_DEFAULT_USER=admin -e RABBITMQ_DEFAULT_PASS=admin rabbitmq:3-management`
+  `docker run --name proxy-collector-rabbit -d -p 15672:15672 -p 5672:5672 -e RABBITMQ_DEFAULT_USER=admin -e RABBITMQ_DEFAULT_PASS=admin -e RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS="-rabbit consumer_timeout false" rabbitmq:3-management`
 - redis for collecting sites:
   `docker run --name proxy-collector-redis-sites -d -p 6379:6379 redis:6`
 - redis for collecting proxies:

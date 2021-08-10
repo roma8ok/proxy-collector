@@ -1,3 +1,7 @@
+## 0.1.2 - in progress
+
+- added advanced config to rabbitMQ
+
 ## 0.1.1 - 2021.08.06
 
 - updated readme
