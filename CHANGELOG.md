@@ -1,3 +1,7 @@
+## 0.2.2 - in progress
+
+- updated tests to set
+
 ## 0.2.1 - 2021.08.12
 
 - removed unused postgres type

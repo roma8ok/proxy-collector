@@ -67,14 +67,14 @@ func findSiteURLsFromDDG(htmlBody string) (urls []string) {
 		urls = append(urls, href)
 	}
 
-	return uniqueArrayOfValues(urls)
+	return set(urls)
 }
 
 func findURLsFromHTML(htmlBody string) []string {
 	reURL := regexp.MustCompile(`https?://(www\.)?[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_+.~#?&/=]*)`)
 	urls := reURL.FindAllString(htmlBody, -1)
 
-	return uniqueArrayOfValues(urls)
+	return set(urls)
 }
 
 func findProxiesFromHTML(htmlBody string) []string {
@@ -82,7 +82,7 @@ func findProxiesFromHTML(htmlBody string) []string {
 	tableProxy := findProxiesFromTable(htmlBody)
 	proxies := append(wholeProxies, tableProxy...)
 
-	return uniqueArrayOfValues(proxies)
+	return set(proxies)
 }
 
 func findWholeProxies(in string) []string {

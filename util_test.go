@@ -5,15 +5,15 @@ import (
 	"testing"
 )
 
-func TestUniqueArrayOfValues_Empty(t *testing.T) {
+func TestSet_EmptySlice(t *testing.T) {
 	var empty []string
-	uniq := uniqueArrayOfValues(empty)
-	if len(uniq) != 0 {
-		t.Errorf(`uniqueArrayOfValues_Unique(%v) = %v, expected %v`, empty, uniq, empty)
+	s := set(empty)
+	if len(s) != 0 {
+		t.Errorf(`set(%v) = %v, expected %v`, empty, s, empty)
 	}
 }
 
-func TestUniqueArrayOfValues_Unique(t *testing.T) {
+func TestSet_SliceWithNonRepeatingValues(t *testing.T) {
 	testCases := [][]string{
 		{"a", "b", "c"},
 		{"1", "2", "3"},
@@ -21,14 +21,14 @@ func TestUniqueArrayOfValues_Unique(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		uniq := uniqueArrayOfValues(testCase)
-		if !reflect.DeepEqual(testCase, uniq) {
-			t.Errorf(`uniqueArrayOfValues_Unique(%v) = %v, expected %v`, testCase, uniq, testCase)
+		s := set(testCase)
+		if !reflect.DeepEqual(testCase, s) {
+			t.Errorf(`set(%v) = %v, expected %v`, testCase, s, testCase)
 		}
 	}
 }
 
-func TestUniqueArrayOfValues_NonUnique(t *testing.T) {
+func TestSet_SliceWithRepeatingValues(t *testing.T) {
 	inCases := [][]string{
 		{"a", "b", "c", "c"},
 		{"1", "2", "3", "3"},
@@ -41,9 +41,9 @@ func TestUniqueArrayOfValues_NonUnique(t *testing.T) {
 	}
 
 	for idx, inCase := range inCases {
-		uniq := uniqueArrayOfValues(inCase)
-		if !reflect.DeepEqual(outCases[idx], uniq) {
-			t.Errorf(`uniqueArrayOfValues_Unique(%v) = %v, expected %v`, inCase, uniq, outCases[idx])
+		s := set(inCase)
+		if !reflect.DeepEqual(outCases[idx], s) {
+			t.Errorf(`set(%v) = %v, expected %v`, inCase, s, outCases[idx])
 		}
 	}
 }

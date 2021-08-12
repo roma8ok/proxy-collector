@@ -7,12 +7,13 @@ import (
 	"time"
 )
 
-func uniqueArrayOfValues(arr []string) (unique []string) {
-	set := make(map[string]struct{})
-	for _, val := range arr {
-		if _, ok := set[val]; !ok {
-			set[val] = struct{}{}
-			unique = append(unique, val)
+// set gets a slice of strings and returns a slice of strings in which each element is not repeated.
+func set(sl []string) (uniq []string) {
+	s := make(map[string]struct{})
+	for _, val := range sl {
+		if _, ok := s[val]; !ok {
+			s[val] = struct{}{}
+			uniq = append(uniq, val)
 		}
 	}
 	return
