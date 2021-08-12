@@ -65,10 +65,12 @@ func TestIsExist_NonExist(t *testing.T) {
 
 func TestIsExist_Exist(t *testing.T) {
 	testCases := [][]string{
-		{"a", "b", "c"},
-		{"a", "a", "a"},
+		{"exist", "b", "c"},
+		{"exist", "exist", "exist"},
+		{"exist"},
+		{"b", "c", "exist"},
 	}
-	exist := "a"
+	exist := "exist"
 
 	for _, testCase := range testCases {
 		if found := isExist(exist, testCase); !found {

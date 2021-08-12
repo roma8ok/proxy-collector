@@ -1,6 +1,7 @@
 ## 0.2.2 - in progress
 
-- updated tests to set
+- updated tests for set
+- updated tests for isExist
 
 ## 0.2.1 - 2021.08.12
 

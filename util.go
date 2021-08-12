@@ -19,9 +19,10 @@ func set(sl []string) (uniq []string) {
 	return
 }
 
-func isExist(val string, arr []string) bool {
-	for _, v := range arr {
-		if v == val {
+// isExist searches for an occurrence of a string in the slice and returns True if the string is found.
+func isExist(s string, in []string) bool {
+	for _, v := range in {
+		if v == s {
 			return true
 		}
 	}
