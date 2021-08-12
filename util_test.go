@@ -79,6 +79,29 @@ func TestIsExist_Exist(t *testing.T) {
 	}
 }
 
+func TestRandomElementFromSlice_EmptySlice(t *testing.T) {
+	sl := make([]string, 0)
+	if out := randomElementFromSlice(sl); out != "" {
+		t.Errorf(`randomElementFromSlice(%v) = "%s", expected ""`, sl, out)
+	}
+}
+
+func TestRandomElementFromSlice_NonEmptySlice(t *testing.T) {
+	sl := []string{"a", "b", "c", ""}
+
+	uniq := make(map[string]struct{})
+	for _, val := range sl {
+		uniq[val] = struct{}{}
+	}
+
+	for i := 0; i < len(sl)*2; i++ {
+		random := randomElementFromSlice(sl)
+		if _, found := uniq[random]; !found {
+			t.Errorf(`randomElementFromSlice(%v) = "%[2]s", but "%[2]s" is missing in input slice`, sl, random)
+		}
+	}
+}
+
 func TestURLsHaveSameDomain_DifferentDomains(t *testing.T) {
 	u1 := "https://google.com"
 	u2 := "https://duckduckgo.com"

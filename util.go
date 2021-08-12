@@ -29,11 +29,13 @@ func isExist(s string, in []string) bool {
 	return false
 }
 
-func randomElementFromArray(arr []string) string {
-	if len(arr) == 0 {
+// randomElementFromSlice gets a slice of strings and returns pseudo-random string from this slice.
+// If the slice is empty randomElementFromSlice returns an empty string.
+func randomElementFromSlice(sl []string) string {
+	if len(sl) == 0 {
 		return ""
 	}
-	return arr[rand.Intn(len(arr))]
+	return sl[rand.Intn(len(sl))]
 }
 
 func urlsHaveSameDomain(u1, u2 string) bool {

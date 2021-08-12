@@ -28,10 +28,10 @@ func fillSearchQueries(app App, queueDest *RabbitMQSession, fromProxies bool) er
 	}
 
 	if len(proxies) > 0 {
-		q = randomElementFromArray(proxies)
+		q = randomElementFromSlice(proxies)
 	} else {
 		queries := []string{"proxy list", "proxy", "proxies", "прокси", "список прокси"}
-		q = randomElementFromArray(queries)
+		q = randomElementFromSlice(queries)
 	}
 
 	if err := queueDest.Push([]byte(q)); err != nil {
