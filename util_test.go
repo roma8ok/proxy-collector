@@ -172,3 +172,87 @@ func TestFormatDuration(t *testing.T) {
 		}
 	}
 }
+
+func TestFillString_EqualLength(t *testing.T) {
+	in := "length_is_12_is_18"
+	requiredLen := 18
+	filling := "*"
+	expectedOut := in
+
+	out := fillString(in, requiredLen, filling)
+	if out != expectedOut {
+		t.Errorf(`fillString("%s", %d, "%s") = "%s", expected %s`, in, requiredLen, filling, out, expectedOut)
+	}
+}
+
+func TestFillString_LongerLength_1(t *testing.T) {
+	in := "length_is_12_is_18"
+	requiredLen := 20
+	filling := "*"
+	expectedOut := "length_is_12_is_18**"
+
+	out := fillString(in, requiredLen, filling)
+	if out != expectedOut {
+		t.Errorf(`fillString("%s", %d, "%s") = "%s", expected "%s"`, in, requiredLen, filling, out, expectedOut)
+	}
+}
+
+func TestFillString_LongerLength_2(t *testing.T) {
+	in := ""
+	requiredLen := 10
+	filling := "*"
+	expectedOut := "**********"
+
+	out := fillString(in, requiredLen, filling)
+	if out != expectedOut {
+		t.Errorf(`fillString("%s", %d, "%s") = "%s", expected "%s"`, in, requiredLen, filling, out, expectedOut)
+	}
+}
+
+func TestFillString_ShorterLength_1(t *testing.T) {
+	in := "length_is_12_is_18"
+	requiredLen := 12
+	filling := "*"
+	expectedOut := "length_is_12"
+
+	out := fillString(in, requiredLen, filling)
+	if out != expectedOut {
+		t.Errorf(`fillString("%s", %d, "%s") = "%s", expected "%s"`, in, requiredLen, filling, out, expectedOut)
+	}
+}
+
+func TestFillString_ShorterLength_2(t *testing.T) {
+	in := "length_is_12_is_18"
+	requiredLen := 0
+	filling := "*"
+	expectedOut := ""
+
+	out := fillString(in, requiredLen, filling)
+	if out != expectedOut {
+		t.Errorf(`fillString("%s", %d, "%s") = "%s", expected "%s"`, in, requiredLen, filling, out, expectedOut)
+	}
+}
+
+func TestFillString_WrongFillingLonger(t *testing.T) {
+	in := "length_is_12_is_18"
+	requiredLen := 20
+	filling := "+-="
+	expectedOut := "length_is_12_is_18++"
+
+	out := fillString(in, requiredLen, filling)
+	if out != expectedOut {
+		t.Errorf(`fillString("%s", %d, "%s") = "%s", expected "%s"`, in, requiredLen, filling, out, expectedOut)
+	}
+}
+
+func TestFillString_WrongFillingEmpty(t *testing.T) {
+	in := "length_is_12_is_18"
+	requiredLen := 20
+	filling := ""
+	expectedOut := "length_is_12_is_18  "
+
+	out := fillString(in, requiredLen, filling)
+	if out != expectedOut {
+		t.Errorf(`fillString("%s", %d, "%s") = "%s", expected "%s"`, in, requiredLen, filling, out, expectedOut)
+	}
+}

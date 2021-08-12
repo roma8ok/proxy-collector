@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net/url"
+	"strings"
 	"time"
 )
 
@@ -76,18 +77,32 @@ func formatDuration(d time.Duration) string {
 	return fmt.Sprintf("%02dm:%02ds:%03dms", min, sec, ms)
 }
 
-func fillString(in string, maxLen int, filling string) (out string) {
-	letters := []rune(in)
-	if len(letters) > maxLen {
-		out += string(letters[:maxLen])
-	} else {
-		for l := 0; l < maxLen; l++ {
-			if l < len(letters) {
-				out += string(letters[l])
-			} else {
-				out += filling
-			}
+// fillString converts a string to the required length.
+// If the required length is greater than the string length, fillString trims the end of the input string.
+// In other cases, fillString added filling to the end of the input string.
+// For correct work filling length must be 1.
+func fillString(in string, requiredLen int, filling string) string {
+	fillingChars := []rune(filling)
+	if len(fillingChars) > 1 {
+		filling = string(fillingChars[:1])
+	}
+	if filling == "" {
+		filling = " "
+	}
+
+	chars := []rune(in)
+
+	if len(chars) > requiredLen {
+		return string(chars[:requiredLen])
+	}
+
+	var sb strings.Builder
+	for l := 0; l < requiredLen; l++ {
+		if l < len(chars) {
+			sb.WriteRune(chars[l])
+		} else {
+			sb.WriteString(filling)
 		}
 	}
-	return
+	return sb.String()
 }

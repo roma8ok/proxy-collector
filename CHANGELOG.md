@@ -6,6 +6,7 @@
 - added tests for urlsHaveSameDomain
 - added link to proxy-list in readme
 - added tests for formatDuration
+- added test for fillString
 
 ## 0.2.1 - 2021.08.12
 
