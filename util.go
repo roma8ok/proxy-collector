@@ -62,6 +62,13 @@ func urlsHaveSameDomain(u1, u2 string) bool {
 	return false
 }
 
+// formatDuration converts time.Duration to string.
+// Output string is 13 characters long (<100 minutes) or more (>=100 minutes).
+//
+// Output examples:
+// 00m:00s:000ms
+// 99m:99s:999ms
+// 100m:00s:000ms
 func formatDuration(d time.Duration) string {
 	min := int64(d.Minutes())
 	sec := int64(d.Seconds()) - min*60

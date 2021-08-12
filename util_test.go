@@ -3,6 +3,7 @@ package main
 import (
 	"reflect"
 	"testing"
+	"time"
 )
 
 func TestSet_EmptySlice(t *testing.T) {
@@ -148,6 +149,26 @@ func TestURLsHaveSameHostnames_SameDomains(t *testing.T) {
 	for _, testCase := range testCases {
 		if same := urlsHaveSameDomain(testCase[0], testCase[1]); !same {
 			t.Errorf(`urlsHaveSameDomain(%s, %v) = %t, expected true`, testCase[0], testCase[1], same)
+		}
+	}
+}
+
+func TestFormatDuration(t *testing.T) {
+	testCases := map[time.Duration]string{
+		0 * time.Second:  "00m:00s:000ms",
+		5 * time.Second:  "00m:05s:000ms",
+		59 * time.Second: "00m:59s:000ms",
+		60 * time.Second: "01m:00s:000ms",
+		2 * time.Minute:  "02m:00s:000ms",
+		60 * time.Minute: "60m:00s:000ms",
+		1*time.Hour + 39*time.Minute + 59*time.Second + 999*time.Millisecond: "99m:59s:999ms",
+		100 * time.Minute: "100m:00s:000ms",
+	}
+
+	for duration, expectedFormat := range testCases {
+		format := formatDuration(duration)
+		if expectedFormat != format {
+			t.Errorf(`formatDuration(%s) = %s, expected %s`, duration, format, expectedFormat)
 		}
 	}
 }
