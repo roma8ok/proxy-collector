@@ -2,6 +2,8 @@
 
 Some services for searching, checking and saving proxies from the WEB.
 
+Found proxies are [here](https://github.com/roma8ok/proxy-list).
+
 ## How it works?
 
 1. Start external and proxy-collector services.

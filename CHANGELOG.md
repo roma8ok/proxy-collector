@@ -4,6 +4,7 @@
 - updated tests for isExist
 - added test for randomElementFromSlice
 - added tests for urlsHaveSameDomain
+- added link to proxy-list in readme
 
 ## 0.2.1 - 2021.08.12
 
