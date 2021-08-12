@@ -22,11 +22,6 @@ type RabbitMQSession struct {
 
 type RabbitMQStreamHandler func(in []byte) (ack bool)
 
-type htmlPayload struct {
-	HTML    string `json:"html"`
-	FromURL string `json:"from_url"`
-}
-
 var (
 	errNotConnected  = errors.New("not connected to a server")
 	errAlreadyClosed = errors.New("already closed: not connected to the server")
@@ -294,4 +289,20 @@ func (session *RabbitMQSession) close() error {
 	close(session.done)
 	session.isReady = false
 	return nil
+}
+
+func (session *RabbitMQSession) messageCount() (int, error) {
+	q, err := session.channel.QueueInspect(session.name)
+	if err != nil {
+		return 0, err
+	}
+	return q.Messages, nil
+}
+
+func (session *RabbitMQSession) consumerCount() (int, error) {
+	q, err := session.channel.QueueInspect(session.name)
+	if err != nil {
+		return 0, err
+	}
+	return q.Consumers, nil
 }

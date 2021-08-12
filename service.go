@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -11,10 +10,10 @@ import (
 	"github.com/pkg/errors"
 )
 
-func fillSearchQueries(app App, queueDest *RabbitMQSession, fromProxies bool) error {
+func findProxySourcesFromDDG(app App, queueDest *RabbitMQSession, fromProxies bool) error {
 	startTime := time.Now()
 
-	var q string
+	var query string
 	proxies := make([]string, 0)
 	if fromProxies {
 		freshProxyList, err := freshProxies(app.postgresPool, time.Minute*60)
@@ -28,34 +27,71 @@ func fillSearchQueries(app App, queueDest *RabbitMQSession, fromProxies bool) er
 	}
 
 	if len(proxies) > 0 {
-		q = randomElementFromSlice(proxies)
+		query = randomElementFromSlice(proxies)
 	} else {
 		queries := []string{"proxy list", "proxy", "proxies", "прокси", "список прокси"}
-		q = randomElementFromSlice(queries)
+		query = randomElementFromSlice(queries)
 	}
 
-	if err := queueDest.Push([]byte(q)); err != nil {
+	searchURL := makeDDGSearchURL(query)
+
+	var headers = map[string]string{
+		"Content-Type": "text/html; charset=UTF-8",
+		"User-Agent":   userAgent,
+	}
+
+	resp, err := sendRequest(searchURL, proxyURL, headers)
+	if err != nil {
+		return err
+	}
+	defer func(Body io.ReadCloser) {
+		if err := Body.Close(); err != nil {
+			app.loki.error(errors.WithStack(err))
+		}
+	}(resp.Body)
+
+	if resp.StatusCode != http.StatusOK {
+		return errors.New(fmt.Sprintf(`sendRequest("%s", "%s", headers); resp.StatusCode = %d`, searchURL, proxyURL, resp.StatusCode))
+	}
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
 		return err
 	}
 
-	app.loki.info(fmt.Sprintf(`Done in %s; added "%s"`, formatDuration(time.Now().Sub(startTime)), q))
+	urls := findSiteURLsFromDDG(body)
+	addedUrls := 0
+	for _, u := range urls {
+		changeType, err := app.rdbForSites.set(u)
+		if err != nil {
+			return err
+		}
+		switch changeType {
+		case redisChangeAdd, redisChangeUpdate:
+			if err := queueDest.Push([]byte(u)); err != nil {
+				return err
+			}
+			addedUrls += 1
+		}
+	}
+
+	app.loki.info(fmt.Sprintf(`Done in %s; found/added: %d/%d urls`, formatDuration(time.Now().Sub(startTime)), len(urls), addedUrls))
+
 	return nil
 }
 
-func sendSearchBodyFromDDGToQueue(app App, queueSource, queueDest *RabbitMQSession, proxyURL, userAgent string) {
+func processProxySources(app App, queueSource, queueDestRawProxies, queueDestProxySourcesDeferred *RabbitMQSession) {
 	var handler RabbitMQStreamHandler = func(in []byte) (ack bool) {
 		startTime := time.Now()
-
-		searchURL := makeDDGSearchURL(string(in))
 
 		var headers = map[string]string{
 			"Content-Type": "text/html; charset=UTF-8",
 			"User-Agent":   userAgent,
 		}
 
-		resp, err := sendRequest(searchURL, proxyURL, headers)
+		proxySource := string(in)
+		resp, err := sendRequest(proxySource, proxyURL, headers)
 		if err != nil {
-			app.loki.debug(fmt.Sprintf(`sendRequest("%s", "%s", headers); err = %s`, searchURL, proxyURL, errors.WithStack(err)))
+			app.loki.debug(fmt.Sprintf(`sendRequest("%s", "%s", headers); err = %s`, proxySource, proxyURL, errors.WithStack(err)))
 			return false
 		}
 		defer func(Body io.ReadCloser) {
@@ -65,121 +101,18 @@ func sendSearchBodyFromDDGToQueue(app App, queueSource, queueDest *RabbitMQSessi
 		}(resp.Body)
 
 		if resp.StatusCode != http.StatusOK {
-			app.loki.debug(fmt.Sprintf(`sendRequest("%s", "%s", headers); resp.StatusCode = %d`, searchURL, proxyURL, resp.StatusCode))
+			app.loki.debug(fmt.Sprintf(`sendRequest("%s", "%s", headers); resp.StatusCode = %d`, proxySource, proxyURL, resp.StatusCode))
 			return false
 		}
-		body, err := ioutil.ReadAll(resp.Body)
+		html, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			app.loki.debug(fmt.Sprintf(`sendRequest("%s", "%s", headers); can't read resp.Body`, searchURL, proxyURL))
+			app.loki.debug(fmt.Sprintf(`sendRequest("%s", "%s", headers); can't read resp.Body`, proxySource, proxyURL))
 			return false
 		}
 
-		if err := queueDest.Push(body); err != nil {
-			app.loki.error(errors.WithStack(err))
-			return false
-		}
-
-		app.loki.info(fmt.Sprintf(`Done in %s; added body from "%s"`, formatDuration(time.Now().Sub(startTime)), searchURL))
-		return true
-	}
-
-	queueSource.handleStream(handler)
-}
-
-func processSearchBodyFromDDG(app App, queueSource, queueDest *RabbitMQSession) {
-	var handler RabbitMQStreamHandler = func(in []byte) (ack bool) {
-		startTime := time.Now()
-
-		urls := findSiteURLsFromDDG(string(in))
-		addedUrls := 0
-		for _, u := range urls {
-			changeType, err := app.rdbForSites.set(u)
-			if err != nil {
-				app.loki.error(errors.WithStack(err))
-				return false
-			}
-			switch changeType {
-			case redisChangeAdd, redisChangeUpdate:
-				if err := queueDest.Push([]byte(u)); err != nil {
-					app.loki.error(errors.WithStack(err))
-					return false
-				}
-				addedUrls += 1
-			}
-		}
-
-		app.loki.info(fmt.Sprintf(`Done in %s; handled %d urls, added %d urls`, formatDuration(time.Now().Sub(startTime)), len(urls), addedUrls))
-		return true
-	}
-
-	queueSource.handleStream(handler)
-}
-
-func sendHTMLFromProxySourceToQueue(app App, queueSource, queueDest *RabbitMQSession) {
-	var handler RabbitMQStreamHandler = func(in []byte) (ack bool) {
-		startTime := time.Now()
-
-		var headers = map[string]string{
-			"Content-Type": "text/html; charset=UTF-8",
-			"User-Agent":   userAgent,
-		}
-
-		u := string(in)
-		resp, err := sendRequest(u, proxyURL, headers)
-		if err != nil {
-			app.loki.debug(fmt.Sprintf(`sendRequest("%s", "%s", headers); err = %s`, u, proxyURL, errors.WithStack(err)))
-			return false
-		}
-		defer func(Body io.ReadCloser) {
-			if err := Body.Close(); err != nil {
-				app.loki.error(errors.WithStack(err))
-			}
-		}(resp.Body)
-
-		if resp.StatusCode != http.StatusOK {
-			app.loki.debug(fmt.Sprintf(`sendRequest("%s", "%s", headers); resp.StatusCode = %d`, u, proxyURL, resp.StatusCode))
-			return false
-		}
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			app.loki.debug(fmt.Sprintf(`sendRequest("%s", "%s", headers); can't read resp.Body`, u, proxyURL))
-			return false
-		}
-		hPayload := htmlPayload{
-			HTML:    string(body),
-			FromURL: u,
-		}
-		hPayloadJSON, err := json.Marshal(hPayload)
-		if err != nil {
-			app.loki.error(fmt.Errorf(`can't json.Marshal(payload) from url "%s": %s`, u, errors.WithStack(err)))
-			return false
-		}
-
-		if err := queueDest.Push(hPayloadJSON); err != nil {
-			app.loki.error(errors.WithStack(err))
-			return false
-		}
-
-		app.loki.info(fmt.Sprintf(`Done in %s; added body from "%s"`, formatDuration(time.Now().Sub(startTime)), u))
-		return true
-	}
-
-	queueSource.handleStream(handler)
-}
-
-func processSourceHTML(app App, queueSource, queueDestRawProxies, queueDestProxySources *RabbitMQSession) {
-	var handler RabbitMQStreamHandler = func(in []byte) (ack bool) {
-		startTime := time.Now()
-
-		var hPayload htmlPayload
-		if err := json.Unmarshal(in, &hPayload); err != nil {
-			app.loki.error(fmt.Errorf(`can't json.Unmarshal(): %s`, errors.WithStack(err)))
-			return false
-		}
-
-		proxies := findProxiesFromHTML(hPayload.HTML)
+		proxiesFromHTML := findProxiesFromHTML(html)
 		addedProxies := 0
-		for _, p := range proxies {
+		for _, p := range proxiesFromHTML {
 			changeType, err := app.rdbForProxies.set(p)
 			if err != nil {
 				app.loki.error(errors.WithStack(err))
@@ -195,25 +128,25 @@ func processSourceHTML(app App, queueSource, queueDestRawProxies, queueDestProxy
 			}
 		}
 
-		urls := findURLsFromHTML(hPayload.HTML)
+		urlsFromHTML := findURLsFromHTML(html)
 		addedURLs := 0
-		if len(proxies) > 0 {
-			for _, u := range urls {
-				if !urlsHaveSameDomain(hPayload.FromURL, u) {
+		if len(proxiesFromHTML) > 0 {
+			for _, urlFromHTML := range urlsFromHTML {
+				if !urlsHaveSameDomain(proxySource, urlFromHTML) {
 					continue
 				}
-				if !possibleForProxySourceURL(u) {
+				if !possibleForProxySourceURL(urlFromHTML) {
 					continue
 				}
 
-				changeType, err := app.rdbForSites.set(u)
+				changeType, err := app.rdbForSites.set(urlFromHTML)
 				if err != nil {
 					app.loki.error(errors.WithStack(err))
 					return false
 				}
 				switch changeType {
 				case redisChangeAdd, redisChangeUpdate:
-					if err := queueDestProxySources.Push([]byte(u)); err != nil {
+					if err := queueDestProxySourcesDeferred.Push([]byte(urlFromHTML)); err != nil {
 						app.loki.error(errors.WithStack(err))
 						return false
 					}
@@ -222,7 +155,25 @@ func processSourceHTML(app App, queueSource, queueDestRawProxies, queueDestProxy
 			}
 		}
 
-		app.loki.info(fmt.Sprintf(`Done in %s; processed "%s"; found/added: %d/%d proxies, %d/%d urls`, formatDuration(time.Now().Sub(startTime)), hPayload.FromURL, len(proxies), addedProxies, len(urls), addedURLs))
+		app.loki.info(fmt.Sprintf(`Done in %s; found/added: %d/%d proxies, %d/%d urls; processed "%s"`,
+			formatDuration(time.Now().Sub(startTime)), len(proxiesFromHTML), addedProxies, len(urlsFromHTML), addedURLs, proxySource))
+
+		return true
+	}
+
+	queueSource.handleStream(handler)
+}
+
+func transferDeferredProxySources(app App, queueSource, queueDest *RabbitMQSession) {
+	var handler RabbitMQStreamHandler = func(in []byte) (ack bool) {
+		startTime := time.Now()
+
+		if err := queueDest.Push(in); err != nil {
+			app.loki.error(errors.WithStack(err))
+			return false
+		}
+
+		app.loki.info(fmt.Sprintf(`Done in %s; transfer "%s"`, formatDuration(time.Now().Sub(startTime)), string(in)))
 		return true
 	}
 
@@ -255,7 +206,7 @@ func processRawProxy(app App, queueSource *RabbitMQSession) {
 	queueSource.handleStream(handler)
 }
 
-func fillCheckProxiesQueue(app App, queueDest *RabbitMQSession) error {
+func fillCheckProxies(app App, queueDest *RabbitMQSession) error {
 	startTime := time.Now()
 
 	proxies, err := freshProxies(app.postgresPool, time.Hour*24*30) // 30 days
@@ -272,7 +223,7 @@ func fillCheckProxiesQueue(app App, queueDest *RabbitMQSession) error {
 	return nil
 }
 
-func processCheckProxy(app App, queueSource *RabbitMQSession) {
+func processCheckProxies(app App, queueSource *RabbitMQSession) {
 	var handler RabbitMQStreamHandler = func(in []byte) (ack bool) {
 		startTime := time.Now()
 
@@ -295,7 +246,7 @@ func processCheckProxy(app App, queueSource *RabbitMQSession) {
 			return false
 		}
 
-		app.loki.info(fmt.Sprintf(`Done in %s; updated last check (active) "%s"`, formatDuration(time.Now().Sub(startTime)), pURL))
+		app.loki.info(fmt.Sprintf(`Done in %s; proxy is active "%s"`, formatDuration(time.Now().Sub(startTime)), pURL))
 		return true
 	}
 

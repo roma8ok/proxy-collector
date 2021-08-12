@@ -1,4 +1,8 @@
-## 0.2.2 - 2021.08.12
+## 0.3.0 - 2021.08.12
+
+- refactored queues
+
+## 0.2.2 (release)  - 2021.08.12
 
 - updated tests for set
 - updated tests for isExist
@@ -12,20 +16,20 @@
 
 - removed unused postgres type
 
-## 0.2.0 (release) - 2021.08.10
+## 0.2.0 - 2021.08.10
 
 - added advanced config to rabbitMQ
 - updated service exit channel
 - ip_api_url changed
 - updated checkProxy
 
-## 0.1.1 - 2021.08.06
+## 0.1.1 (release) - 2021.08.06
 
 - updated readme
 - added comments
 - refactored
 
-### 0.1.0 (release) - 2021.08.04
+### 0.1.0 - 2021.08.04
 
 - added error logs
 - changed queues durable to true

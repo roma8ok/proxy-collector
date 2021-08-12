@@ -21,13 +21,11 @@ func main() {
 	signal.Notify(exit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)
 
 	services := []string{
-		serviceFillSearchQueries,
-		serviceSendSearchBodyFromDDGToQueue,
-		serviceProcessSearchBodyFromDDG,
-		serviceSendHTMLFromProxySourceToQueue,
-		serviceProcessSourceHTML,
-		serviceProcessRawProxy,
-		serviceFillCheckProxiesQueue,
+		serviceFindProxySourcesFromDDG,
+		serviceProcessProxySources,
+		serviceTransferDeferredProxySources,
+		serviceProcessRawProxies,
+		serviceFillCheckProxies,
 		serviceProcessCheckProxies,
 	}
 
@@ -90,16 +88,17 @@ func main() {
 		hostExtIP:     hostExtIP,
 	}
 
+	loki.info(fmt.Sprintf("Start to run %d worker(s)", *workersFlag))
 	for i := 0; i < *workersFlag; i++ {
 		loki.info(fmt.Sprintf("Service started (worker %d)", i))
 
-		if *serviceFlag == serviceFillSearchQueries {
+		if *serviceFlag == serviceFindProxySourcesFromDDG {
 			fromProxies := false
-			queueDest := NewRabbitMQSession(app.loki, queueSearchQueries, app.conf.RabbitURL)
+			queueDest := NewRabbitMQSession(app.loki, queueProxySources, app.conf.RabbitURL)
 
 			go func() {
 				for {
-					if err := fillSearchQueries(app, queueDest, fromProxies); err != nil {
+					if err := findProxySourcesFromDDG(app, queueDest, fromProxies); err != nil {
 						loki.error(errors.WithStack(err))
 					}
 					fromProxies = !fromProxies
@@ -108,41 +107,29 @@ func main() {
 			}()
 		}
 
-		if *serviceFlag == serviceSendSearchBodyFromDDGToQueue {
-			queueSource := NewRabbitMQSession(app.loki, queueSearchQueries, app.conf.RabbitURL)
-			queueDest := NewRabbitMQSession(app.loki, queueSearchBodiesFromDDG, app.conf.RabbitURL)
-			go sendSearchBodyFromDDGToQueue(app, queueSource, queueDest, proxyURL, userAgent)
-		}
-
-		if *serviceFlag == serviceProcessSearchBodyFromDDG {
-			queueSource := NewRabbitMQSession(app.loki, queueSearchBodiesFromDDG, app.conf.RabbitURL)
-			queueDest := NewRabbitMQSession(app.loki, queueProxySources, app.conf.RabbitURL)
-			go processSearchBodyFromDDG(app, queueSource, queueDest)
-		}
-
-		if *serviceFlag == serviceSendHTMLFromProxySourceToQueue {
+		if *serviceFlag == serviceProcessProxySources {
 			queueSource := NewRabbitMQSession(app.loki, queueProxySources, app.conf.RabbitURL)
-			queueDest := NewRabbitMQSession(app.loki, queueProxySourceHTML, app.conf.RabbitURL)
-			go sendHTMLFromProxySourceToQueue(app, queueSource, queueDest)
+			queueDestRawProxies := NewRabbitMQSession(app.loki, queueRawProxies, app.conf.RabbitURL)
+			queueDestProxySourcesDeferred := NewRabbitMQSession(app.loki, queueProxySourcesDeferred, app.conf.RabbitURL)
+			go processProxySources(app, queueSource, queueDestRawProxies, queueDestProxySourcesDeferred)
 		}
 
-		if *serviceFlag == serviceProcessSourceHTML {
-			queueSource := NewRabbitMQSession(app.loki, queueProxySourceHTML, app.conf.RabbitURL)
-			chDestRawProxies := NewRabbitMQSession(app.loki, queueRawProxies, app.conf.RabbitURL)
-			chDestProxySources := NewRabbitMQSession(app.loki, queueProxySources, app.conf.RabbitURL)
-			go processSourceHTML(app, queueSource, chDestRawProxies, chDestProxySources)
+		if *serviceFlag == serviceTransferDeferredProxySources {
+			queueSource := NewRabbitMQSession(app.loki, queueProxySourcesDeferred, app.conf.RabbitURL)
+			queueDest := NewRabbitMQSession(app.loki, queueProxySources, app.conf.RabbitURL)
+			go transferDeferredProxySources(app, queueSource, queueDest)
 		}
 
-		if *serviceFlag == serviceProcessRawProxy {
+		if *serviceFlag == serviceProcessRawProxies {
 			queueSource := NewRabbitMQSession(app.loki, queueRawProxies, app.conf.RabbitURL)
 			go processRawProxy(app, queueSource)
 		}
 
-		if *serviceFlag == serviceFillCheckProxiesQueue {
+		if *serviceFlag == serviceFillCheckProxies {
 			queueDest := NewRabbitMQSession(app.loki, queueCheckProxies, app.conf.RabbitURL)
 			go func() {
 				for {
-					if err := fillCheckProxiesQueue(app, queueDest); err != nil {
+					if err := fillCheckProxies(app, queueDest); err != nil {
 						loki.error(errors.WithStack(err))
 					}
 					time.Sleep(10 * time.Minute)
@@ -152,7 +139,7 @@ func main() {
 
 		if *serviceFlag == serviceProcessCheckProxies {
 			queueSource := NewRabbitMQSession(app.loki, queueCheckProxies, app.conf.RabbitURL)
-			go processCheckProxy(app, queueSource)
+			go processCheckProxies(app, queueSource)
 		}
 	}
 

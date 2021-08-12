@@ -15,12 +15,10 @@ const (
 	requestTimeout = 5 * time.Second
 
 	// RabbitMQ queue names:
-	queueSearchQueries       = "1_search_queries"
-	queueSearchBodiesFromDDG = "2_search_bodies_from_DDG"
-	queueProxySources        = "3_proxy_sources"
-	queueProxySourceHTML     = "4_proxy_source_html"
-	queueRawProxies          = "5_raw_proxies"
-	queueCheckProxies        = "6_check_proxies"
+	queueProxySources         = "proxy_sources"
+	queueProxySourcesDeferred = "proxy_sources_deferred"
+	queueRawProxies           = "raw_proxies"
+	queueCheckProxies         = "check_proxies"
 
 	rabbitMQReconnectDelay     = 30 * time.Second // When reconnecting to the server after connection failure
 	rabbitMQReInitDelay        = 30 * time.Second // When setting up the channel after a channel exception
@@ -32,14 +30,12 @@ const (
 	lokiBatchWait = time.Second * 5
 
 	// Service names:
-	serviceFillSearchQueries              = "fillSearchQueries"
-	serviceSendSearchBodyFromDDGToQueue   = "sendSearchBodyFromDDGToQueue"
-	serviceProcessSearchBodyFromDDG       = "processSearchBodyFromDDG"
-	serviceSendHTMLFromProxySourceToQueue = "sendHTMLFromProxySourceToQueue"
-	serviceProcessSourceHTML              = "processSourceHTML"
-	serviceProcessRawProxy                = "processRawProxy"
-	serviceFillCheckProxiesQueue          = "fillCheckProxiesQueue"
-	serviceProcessCheckProxies            = "processCheckProxies"
+	serviceFindProxySourcesFromDDG      = "findProxySourcesFromDDG"
+	serviceProcessProxySources          = "processProxySources"
+	serviceTransferDeferredProxySources = "transferDeferredProxySources"
+	serviceProcessRawProxies            = "processRawProxies"
+	serviceFillCheckProxies             = "fillCheckProxies"
+	serviceProcessCheckProxies          = "processCheckProxies"
 )
 
 // Config is app urls configuration

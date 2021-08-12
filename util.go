@@ -106,3 +106,11 @@ func fillString(in string, requiredLen int, filling string) string {
 	}
 	return sb.String()
 }
+
+func convertBytesToStringSlice(data [][]byte) []string {
+	sl := make([]string, len(data))
+	for row := range data {
+		sl[row] = string(data[row])
+	}
+	return sl
+}

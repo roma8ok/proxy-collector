@@ -57,12 +57,12 @@ func sendRequest(searchURL, proxyURL string, headers map[string]string) (*http.R
 	return resp, nil
 }
 
-func findSiteURLsFromDDG(htmlBody string) (urls []string) {
+func findSiteURLsFromDDG(html []byte) (urls []string) {
 	reABody := regexp.MustCompile(`<a class="result__url" href=".+?">`)
-	linkBodies := reABody.FindAllString(htmlBody, -1)
+	linkBodies := reABody.FindAll(html, -1)
 
 	for _, linkBody := range linkBodies {
-		href := strings.TrimPrefix(linkBody, `<a class="result__url" href="`)
+		href := strings.TrimPrefix(string(linkBody), `<a class="result__url" href="`)
 		href = strings.TrimSuffix(href, `">`)
 		urls = append(urls, href)
 	}
@@ -70,35 +70,36 @@ func findSiteURLsFromDDG(htmlBody string) (urls []string) {
 	return set(urls)
 }
 
-func findURLsFromHTML(htmlBody string) []string {
-	reURL := regexp.MustCompile(`https?://(www\.)?[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_+.~#?&/=]*)`)
-	urls := reURL.FindAllString(htmlBody, -1)
+func findURLsFromHTML(html []byte) []string {
+	re := regexp.MustCompile(`https?://(www\.)?[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_+.~#?&/=]*)`)
+	urls := re.FindAll(html, -1)
 
-	return set(urls)
+	return set(convertBytesToStringSlice(urls))
 }
 
-func findProxiesFromHTML(htmlBody string) []string {
-	wholeProxies := findWholeProxies(htmlBody)
-	tableProxy := findProxiesFromTable(htmlBody)
+func findProxiesFromHTML(html []byte) []string {
+	wholeProxies := findWholeProxies(html)
+	tableProxy := findProxiesFromTable(html)
 	proxies := append(wholeProxies, tableProxy...)
 
 	return set(proxies)
 }
 
-func findWholeProxies(in string) []string {
+func findWholeProxies(in []byte) []string {
 	re := regexp.MustCompile(`\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b:\d{2,5}`)
-	return re.FindAllString(in, -1)
+	return convertBytesToStringSlice(re.FindAll(in, -1))
 }
 
-func findProxiesFromTable(in string) (proxies []string) {
+func findProxiesFromTable(in []byte) (proxies []string) {
 	reTR := regexp.MustCompile(`<tr>.+?</tr>`)
-	trs := reTR.FindAllString(in, -1)
+	trs := reTR.FindAll(in, -1)
 
 	reTDs := regexp.MustCompile(`<td.*?>\b((?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))\b</td>.*?<td.*?>(\d{2,5})</td>`)
 	for _, tr := range trs {
-		tds := reTDs.FindStringSubmatch(tr)
+		tds := reTDs.FindSubmatch(tr)
+
 		if len(tds) == 3 {
-			proxies = append(proxies, fmt.Sprintf("%s:%s", tds[1], tds[2]))
+			proxies = append(proxies, fmt.Sprintf("%s:%s", string(tds[1]), string(tds[2])))
 		}
 	}
 
