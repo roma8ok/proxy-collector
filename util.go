@@ -38,15 +38,24 @@ func randomElementFromSlice(sl []string) string {
 	return sl[rand.Intn(len(sl))]
 }
 
+// urlsHaveSameDomain compares two URLs and returns true if URLs have the same domain.
 func urlsHaveSameDomain(u1, u2 string) bool {
 	u1Parsed, err := url.Parse(u1)
 	if err != nil {
 		return false
 	}
+	if u1Parsed.Hostname() == "" {
+		return false
+	}
+
 	u2Parsed, err := url.Parse(u2)
 	if err != nil {
 		return false
 	}
+	if u2Parsed.Hostname() == "" {
+		return false
+	}
+
 	if u1Parsed.Hostname() == u2Parsed.Hostname() {
 		return true
 	}

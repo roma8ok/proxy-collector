@@ -102,20 +102,52 @@ func TestRandomElementFromSlice_NonEmptySlice(t *testing.T) {
 	}
 }
 
-func TestURLsHaveSameDomain_DifferentDomains(t *testing.T) {
-	u1 := "https://google.com"
-	u2 := "https://duckduckgo.com"
+func TestURLsHaveSameHostnames_WrongInput(t *testing.T) {
+	testCases := [][]string{
+		{"https://google.com", "https"},
+		{"https://google.com", "google.com"},
+		{"https://google.com", "com"},
+		{"https://google.com", ""},
+		{"", ""},
+		{"https", "https"},
+		{"google.com", "google.com"},
+		{"com", "com"},
+	}
 
-	if same := urlsHaveSameDomain(u1, u2); same {
-		t.Errorf(`urlsHaveSameDomain(%s, %v) = %t, expected false`, u1, u2, same)
+	for _, testCase := range testCases {
+		if same := urlsHaveSameDomain(testCase[0], testCase[1]); same {
+			t.Errorf(`urlsHaveSameDomain(%s, %v) = %t, expected false`, testCase[0], testCase[1], same)
+		}
 	}
 }
 
-func TestURLsHaveSameDomain_SameDomains(t *testing.T) {
-	u1 := "https://google.com:56789/"
-	u2 := "http://google.com/hello?q=123"
+func TestURLsHaveSameHostnames_DifferentDomains(t *testing.T) {
+	testCases := [][]string{
+		{"https://google.com", "https://duckduckgo.com"},
+		{"https://google.com", "https://api.duckduckgo.com"},
+		{"https://google.com", "https://google.ru"},
+		{"https://google.com", "https://www.google.com"},
+		{"https://google.com", "https://api.google.com"},
+	}
 
-	if same := urlsHaveSameDomain(u1, u2); !same {
-		t.Errorf(`urlsHaveSameDomain(%s, %v) = %t, expected true`, u1, u2, same)
+	for _, testCase := range testCases {
+		if same := urlsHaveSameDomain(testCase[0], testCase[1]); same {
+			t.Errorf(`urlsHaveSameDomain(%s, %v) = %t, expected false`, testCase[0], testCase[1], same)
+		}
+	}
+}
+
+func TestURLsHaveSameHostnames_SameDomains(t *testing.T) {
+	testCases := [][]string{
+		{"https://google.com", "https://google.com"},
+		{"https://google.com", "https://google.com"},
+		{"https://google.com", "http://google.com/"},
+		{"https://google.com:56789/", "http://google.com/hello?q=123"},
+	}
+
+	for _, testCase := range testCases {
+		if same := urlsHaveSameDomain(testCase[0], testCase[1]); !same {
+			t.Errorf(`urlsHaveSameDomain(%s, %v) = %t, expected true`, testCase[0], testCase[1], same)
+		}
 	}
 }
