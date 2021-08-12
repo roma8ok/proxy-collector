@@ -1,4 +1,4 @@
-## 0.2.2 - in progress
+## 0.2.2 - 2021.08.12
 
 - updated tests for set
 - updated tests for isExist
