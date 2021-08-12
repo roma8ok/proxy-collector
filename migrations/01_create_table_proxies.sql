@@ -1,5 +1,3 @@
-CREATE TYPE proxy_type as ENUM ('http', 'https', 'socks');
-
 CREATE TABLE IF NOT EXISTS proxies
 (
     id         SERIAL PRIMARY KEY,

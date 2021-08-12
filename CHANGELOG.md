@@ -1,3 +1,7 @@
+## 0.2.1 - 2021.08.12
+
+- removed unused postgres type
+
 ## 0.2.0 (release) - 2021.08.10
 
 - added advanced config to rabbitMQ
