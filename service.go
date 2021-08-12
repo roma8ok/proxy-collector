@@ -74,7 +74,8 @@ func findProxySourcesFromDDG(app App, queueDest *RabbitMQSession, fromProxies bo
 		}
 	}
 
-	app.loki.info(fmt.Sprintf(`Done in %s; found/added: %d/%d urls`, formatDuration(time.Now().Sub(startTime)), len(urls), addedUrls))
+	app.loki.info(fmt.Sprintf(`Done in %s; found/added: %d/%d urls; query: "%s"`,
+		formatDuration(time.Now().Sub(startTime)), len(urls), addedUrls, query))
 
 	return nil
 }
