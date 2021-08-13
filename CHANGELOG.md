@@ -3,6 +3,7 @@
 - updated findProxySourcesFromDDG finish logger info
 - added test for convertBytesToStringSlice
 - added makeDDGSearchURL description
+- added tests for sendGetRequest
 
 ## 0.3.0 - 2021.08.12
 

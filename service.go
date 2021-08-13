@@ -2,9 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io"
-	"io/ioutil"
-	"net/http"
 	"time"
 
 	"github.com/pkg/errors"
@@ -40,20 +37,7 @@ func findProxySourcesFromDDG(app App, queueDest *RabbitMQSession, fromProxies bo
 		"User-Agent":   userAgent,
 	}
 
-	resp, err := sendRequest(searchURL, proxyURL, headers)
-	if err != nil {
-		return err
-	}
-	defer func(Body io.ReadCloser) {
-		if err := Body.Close(); err != nil {
-			app.loki.error(errors.WithStack(err))
-		}
-	}(resp.Body)
-
-	if resp.StatusCode != http.StatusOK {
-		return errors.New(fmt.Sprintf(`sendRequest("%s", "%s", headers); resp.StatusCode = %d`, searchURL, proxyURL, resp.StatusCode))
-	}
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := sendGetRequest(app.loki, searchURL, proxyURL, headers)
 	if err != nil {
 		return err
 	}
@@ -90,22 +74,8 @@ func processProxySources(app App, queueSource, queueDestRawProxies, queueDestPro
 		}
 
 		proxySource := string(in)
-		resp, err := sendRequest(proxySource, proxyURL, headers)
-		if err != nil {
-			app.loki.debug(fmt.Sprintf(`sendRequest("%s", "%s", headers); err = %s`, proxySource, proxyURL, errors.WithStack(err)))
-			return false
-		}
-		defer func(Body io.ReadCloser) {
-			if err := Body.Close(); err != nil {
-				app.loki.error(errors.WithStack(err))
-			}
-		}(resp.Body)
+		html, err := sendGetRequest(app.loki, proxySource, proxyURL, headers)
 
-		if resp.StatusCode != http.StatusOK {
-			app.loki.debug(fmt.Sprintf(`sendRequest("%s", "%s", headers); resp.StatusCode = %d`, proxySource, proxyURL, resp.StatusCode))
-			return false
-		}
-		html, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			app.loki.debug(fmt.Sprintf(`sendRequest("%s", "%s", headers); can't read resp.Body`, proxySource, proxyURL))
 			return false

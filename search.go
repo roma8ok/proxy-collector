@@ -3,10 +3,14 @@ package main
 import (
 	"crypto/tls"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"regexp"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
 // makeDDGSearchURL creates a URL to send a query request to DuckDuckGo.
@@ -23,12 +27,12 @@ func makeDDGSearchURL(query string) string {
 	return u.String()
 }
 
-func sendRequest(searchURL, proxyURL string, headers map[string]string) (*http.Response, error) {
+// sendGetRequest send GET request through proxy and returns the response body and an error.
+// If proxyURL is equal empty string, proxy is not used.
+func sendGetRequest(logger Logger, toURL, proxyURL string, headers map[string]string) ([]byte, error) {
 	tr := &http.Transport{
-		TLSClientConfig:       &tls.Config{InsecureSkipVerify: true},
-		IdleConnTimeout:       requestTimeout,
-		ResponseHeaderTimeout: requestTimeout,
-		ExpectContinueTimeout: requestTimeout,
+		DisableKeepAlives: true,
+		TLSClientConfig:   &tls.Config{InsecureSkipVerify: true},
 	}
 
 	if proxyURL != "" {
@@ -39,9 +43,12 @@ func sendRequest(searchURL, proxyURL string, headers map[string]string) (*http.R
 		tr.Proxy = http.ProxyURL(p)
 	}
 
-	client := &http.Client{Transport: tr}
+	client := &http.Client{
+		Timeout:   requestTimeout,
+		Transport: tr,
+	}
 
-	req, err := http.NewRequest(http.MethodGet, searchURL, nil)
+	req, err := http.NewRequest(http.MethodGet, toURL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -55,7 +62,22 @@ func sendRequest(searchURL, proxyURL string, headers map[string]string) (*http.R
 		return nil, err
 	}
 
-	return resp, nil
+	defer func(Body io.ReadCloser) {
+		if err := Body.Close(); err != nil {
+			logger.error(errors.WithStack(err))
+		}
+	}(resp.Body)
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, errStatusCodeNotOK
+	}
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	return body, nil
 }
 
 func findSiteURLsFromDDG(html []byte) (urls []string) {

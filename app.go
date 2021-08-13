@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"time"
 
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -36,6 +37,10 @@ const (
 	serviceProcessRawProxies            = "processRawProxies"
 	serviceFillCheckProxies             = "fillCheckProxies"
 	serviceProcessCheckProxies          = "processCheckProxies"
+)
+
+var (
+	errStatusCodeNotOK = errors.New("status code is not 200")
 )
 
 // Config is app urls configuration
