@@ -9,6 +9,7 @@ import (
 	"strings"
 )
 
+// makeDDGSearchURL creates a URL to send a query request to DuckDuckGo.
 func makeDDGSearchURL(query string) string {
 	u := url.URL{
 		Scheme: "https",
