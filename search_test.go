@@ -4,6 +4,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"testing"
 )
 
@@ -13,6 +14,55 @@ func TestMakeDDGSearchURL(t *testing.T) {
 	query := makeDDGSearchURL("proxy list")
 	if query != rightQueryURL {
 		t.Errorf(`makeDDGSearchURL("proxy list") = %s, expected %s`, query, rightQueryURL)
+	}
+}
+
+func TestFindSiteURLsFromDDG_EmptyHTML(t *testing.T) {
+	expected := make([]string, 0)
+
+	got := findSiteURLsFromDDG([]byte{})
+	if len(got) != 0 {
+		t.Errorf(`findSiteURLsFromDDG("") = %v, expected %v`, got, expected)
+	}
+}
+
+func TestFindSiteURLsFromDDG_Success(t *testing.T) {
+	expected := []string{
+		"https://www.merriam-webster.com/dictionary/query",
+		"https://support.microsoft.com/en-us/office/introduction-to-queries-a9739a09-d3ff-4f36-8ac3-5760249fb65c",
+		"https://www.dictionary.com/browse/query",
+		"https://www.thefreedictionary.com/query",
+		"https://www.webopedia.com/definitions/query/",
+		"https://dictionary.cambridge.org/dictionary/english/query",
+		"https://www.techopedia.com/definition/5736/query",
+		"https://support.microsoft.com/en-us/office/create-a-simple-select-query-de8b1c8d-14e9-4b25-8e22-70888d54de59",
+		"https://docs.microsoft.com/en-us/sql/t-sql/xml/query-method-xml-data-type",
+		"https://www.baeldung.com/spring-data-jpa-query",
+		"https://docs.microsoft.com/en-us/azure/cosmos-db/sql-query-getting-started",
+		"https://www.merriam-webster.com/thesaurus/query",
+		"https://www.imdb.com/title/tt11086128/",
+		"https://www.educative.io/blog/what-is-database-query-sql-nosql",
+		"https://support.google.com/docs/answer/3093343?hl=en",
+		"https://www.thefreedictionary.com/queries",
+		"https://www.vocabulary.com/dictionary/query",
+		"https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_Query.html",
+		"https://legal-dictionary.thefreedictionary.com/query",
+		"https://dictionary.cambridge.org/vi/dictionary/english/query",
+		"https://firebase.google.com/docs/reference/android/com/google/firebase/database/Query",
+		"https://clearinghouse.fmcsa.dot.gov/Query/Plan",
+		"https://developer.android.com/reference/android/arch/persistence/room/Query",
+		"https://medical-dictionary.thefreedictionary.com/query",
+		"https://www.collinsdictionary.com/dictionary/english/query",
+		"https://www.thesaurus.com/browse/query",
+		"https://financial-dictionary.thefreedictionary.com/Query",
+		"https://cloud.google.com/bigquery/docs/reference/standard-sql/query-syntax",
+		"https://en.wikipedia.org/wiki/Query_language",
+		"https://www.petrikainulainen.net/programming/spring-framework/spring-data-jpa-tutorial-creating-database-queries-with-the-query-annotation/",
+	}
+
+	got := findSiteURLsFromDDG([]byte(duckDuckGoSearchHTML))
+	if !reflect.DeepEqual(expected, got) {
+		t.Errorf(`findSiteURLsFromDDG(html) = %v, expected %v`, got, expected)
 	}
 }
 

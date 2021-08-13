@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/tls"
 	"fmt"
 	"io"
@@ -8,7 +9,6 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
-	"strings"
 
 	"github.com/pkg/errors"
 )
@@ -25,6 +25,24 @@ func makeDDGSearchURL(query string) string {
 	u.RawQuery = q.Encode()
 
 	return u.String()
+}
+
+// findSiteURLsFromDDG returns urls from html.
+// findSiteURLsFromDDG only works correctly with DuckDuckGo html pages.
+// URL of this page, for example: https://html.duckduckgo.com/html?q=query
+func findSiteURLsFromDDG(html []byte) (urls []string) {
+	reABody := regexp.MustCompile(`<a class="result__url" href=".+?">`)
+	linkBodies := reABody.FindAll(html, -1)
+
+	prefix := []byte(`<a class="result__url" href="`)
+	suffix := []byte(`">`)
+	for _, linkBody := range linkBodies {
+		href := bytes.TrimPrefix(linkBody, prefix)
+		href = bytes.TrimSuffix(href, suffix)
+		urls = append(urls, string(href))
+	}
+
+	return set(urls)
 }
 
 // sendGetRequest send GET request through proxy and returns the response body and an error.
@@ -78,19 +96,6 @@ func sendGetRequest(logger Logger, toURL, proxyURL string, headers map[string]st
 	}
 
 	return body, nil
-}
-
-func findSiteURLsFromDDG(html []byte) (urls []string) {
-	reABody := regexp.MustCompile(`<a class="result__url" href=".+?">`)
-	linkBodies := reABody.FindAll(html, -1)
-
-	for _, linkBody := range linkBodies {
-		href := strings.TrimPrefix(string(linkBody), `<a class="result__url" href="`)
-		href = strings.TrimSuffix(href, `">`)
-		urls = append(urls, href)
-	}
-
-	return set(urls)
 }
 
 func findURLsFromHTML(html []byte) []string {

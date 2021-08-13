@@ -4,6 +4,7 @@
 - added test for convertBytesToStringSlice
 - added makeDDGSearchURL description
 - added tests for sendGetRequest
+- added tests for findSiteURLsFromDDG
 
 ## 0.3.0 - 2021.08.12
 
