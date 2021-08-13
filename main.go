@@ -122,7 +122,7 @@ func main() {
 
 		if *serviceFlag == serviceProcessRawProxies {
 			queueSource := NewRabbitMQSession(app.loki, queueRawProxies, app.conf.RabbitURL)
-			go processRawProxy(app, queueSource)
+			go processRawProxies(app, queueSource)
 		}
 
 		if *serviceFlag == serviceFillCheckProxies {

@@ -5,6 +5,7 @@
 - added makeDDGSearchURL description
 - added tests for sendGetRequest
 - added tests for findSiteURLsFromDDG
+- fix typo
 
 ## 0.3.0 - 2021.08.12
 

@@ -151,7 +151,7 @@ func transferDeferredProxySources(app App, queueSource, queueDest *RabbitMQSessi
 	queueSource.handleStream(handler)
 }
 
-func processRawProxy(app App, queueSource *RabbitMQSession) {
+func processRawProxies(app App, queueSource *RabbitMQSession) {
 	var handler RabbitMQStreamHandler = func(in []byte) (ack bool) {
 		startTime := time.Now()
 
