@@ -256,3 +256,21 @@ func TestFillString_WrongFillingEmpty(t *testing.T) {
 		t.Errorf(`fillString("%s", %d, "%s") = "%s", expected "%s"`, in, requiredLen, filling, out, expectedOut)
 	}
 }
+
+func TestConvertBytesToStringSlice(t *testing.T) {
+	in := [][]byte{
+		{104, 101, 108, 108, 111, 32, 119, 111, 114, 108, 100},
+		{116, 101, 115, 116},
+		{},
+	}
+	expected := []string{
+		"hello world",
+		"test",
+		"",
+	}
+
+	got := convertBytesToStringSlice(in)
+	if !reflect.DeepEqual(expected, got) {
+		t.Errorf(`convertBytesToStringSlice(%b) = %s, expected %v`, in, got, expected)
+	}
+}

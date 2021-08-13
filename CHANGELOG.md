@@ -1,6 +1,7 @@
 ## 0.3.1 - in progress
 
 - updated findProxySourcesFromDDG finish logger info
+- added test for convertBytesToStringSlice
 
 ## 0.3.0 - 2021.08.12
 

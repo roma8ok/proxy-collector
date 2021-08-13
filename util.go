@@ -107,6 +107,7 @@ func fillString(in string, requiredLen int, filling string) string {
 	return sb.String()
 }
 
+// convertBytesToStringSlice converts a slice of slices of bytes to the slice of strings.
 func convertBytesToStringSlice(data [][]byte) []string {
 	sl := make([]string, len(data))
 	for row := range data {
