@@ -9,6 +9,8 @@ Found proxies are [here](https://github.com/roma8ok/proxy-list).
 1. Start external and proxy-collector services.
 2. Get proxies in postgreSQL in table `proxies`. These proxies are fresh because they are checked every 10 minutes.
 
+![image with service interaction](./interaction.png)
+
 ## Production
 
 1. Start external services:
@@ -28,31 +30,19 @@ Found proxies are [here](https://github.com/roma8ok/proxy-list).
 - postgreSQL (within migrations).
 - grafana loki / promtail / grafana.
 
-2. Create config file config-prod.json similar to config-develop.json.
+2. Create config file ./config/prod-app.json similar to ./config/develop-app.json.
 
 - In `ip_api_url` you can use `https://public-ip.dev/`, `https://api64.ipify.org/` or other similar services.
 
-3. Start services (workers number is recommended for AWS t4g.micro). It is recommended to start services at the same
-   time or in reverse order.
+3. Start services (the recommended number of workers in brackets).
 
 - `go build .`
-- `./proxy-collector -config=config-prod.json -service=fillSearchQueries -workers=1`
-- `./proxy-collector -config=config-prod.json -service=sendSearchBodyFromDDGToQueue -workers=1`
-- `./proxy-collector -config=config-prod.json -service=processSearchBodyFromDDG -workers=1`
-- `./proxy-collector -config=config-prod.json -service=sendHTMLFromProxySourceToQueue -workers=12`
-- `./proxy-collector -config=config-prod.json -service=processSourceHTML -workers=56`
-- `./proxy-collector -config=config-prod.json -service=processRawProxy -workers=128`
-- `./proxy-collector -config=config-prod.json -service=fillCheckProxiesQueue -workers=1`
-- `./proxy-collector -config=config-prod.json -service=processCheckProxies -workers=64`
-
-|Queue                   |Consumers                     |Publishers                                 |
-|------------------------|------------------------------|-------------------------------------------|
-|1_search_queries        |sendSearchBodyFromDDGToQueue  |fillSearchQueries                          |
-|2_search_bodies_from_DDG|processSearchBodyFromDDG      |sendSearchBodyFromDDGToQueue               |
-|3_proxy_sources         |sendHTMLFromProxySourceToQueue|processSearchBodyFromDDG, processSourceHTML|
-|4_proxy_source_html     |processSourceHTML             |sendHTMLFromProxySourceToQueue             |
-|5_raw_proxies           |processRawProxy               |processSourceHTML                          |
-|6_check_proxies         |processCheckProxies           |fillCheckProxiesQueue                      |
+- `./proxy-collector -config=./config/prod-app.json -service=findProxySourcesFromDDG -workers=1` (only 1)
+- `./proxy-collector -config=./config/prod-app.json -service=processProxySources -workers=64` (>=64)
+- `./proxy-collector -config=./config/prod-app.json -service=transferDeferredProxySources -workers=1` (only 1)
+- `./proxy-collector -config=./config/prod-app.json -service=processRawProxies -workers=512` (>=512)
+- `./proxy-collector -config=./config/prod-app.json -service=fillCheckProxies -workers=1` (only 1)
+- `./proxy-collector -config=./config/prod-app.json -service=processCheckProxies -workers=64` (>=64)
 
 ## Local development
 
@@ -69,8 +59,8 @@ Found proxies are [here](https://github.com/roma8ok/proxy-list).
     2. execute migrations:
        `for f in migrations/*.sql; do; docker exec -t proxy-collector-postgres psql -U admin -d admin -f "/$f"; done`
 - grafana loki / promtail / grafana:
-    1. `docker run --name proxy-collector-loki -d -v $(pwd):/mnt/config -p 3100:3100 grafana/loki:2.2.1 -config.file=/mnt/config/config-loki.yaml`
-    2. `docker run --name proxy-collector-promtail -d -v $(pwd):/mnt/config -v /var/log:/var/log grafana/promtail:2.2.1 -config.file=/mnt/config/config-promtail.yaml`
+    1. `docker run --name proxy-collector-loki -d -v $(pwd)/config:/mnt/config -p 3100:3100 grafana/loki:2.2.1 -config.file=/mnt/config/develop-loki.yaml`
+    2. `docker run --name proxy-collector-promtail -d -v $(pwd)/config:/mnt/config -v /var/log:/var/log grafana/promtail:2.2.1 -config.file=/mnt/config/develop-promtail.yaml`
     3. `docker run --name proxy-collector-grafana -d -p 3000:3000 grafana/grafana:latest`
     4. go to http://localhost:3000 (login: `admin`, password: `admin`) and add data source -> Loki -> set url
        to http://localhost:3100 (on macOS - http://docker.for.mac.localhost:3100)
@@ -78,14 +68,12 @@ Found proxies are [here](https://github.com/roma8ok/proxy-list).
 2. Start services (it is necessary to start at least one instance of each service for correct work):
 
 - `go build .`
-- `./proxy-collector -config=config-develop.json -service=fillSearchQueries`
-- `./proxy-collector -config=config-develop.json -service=sendSearchBodyFromDDGToQueue`
-- `./proxy-collector -config=config-develop.json -service=processSearchBodyFromDDG`
-- `./proxy-collector -config=config-develop.json -service=sendHTMLFromProxySourceToQueue`
-- `./proxy-collector -config=config-develop.json -service=processSourceHTML`
-- `./proxy-collector -config=config-develop.json -service=processRawProxy`
-- `./proxy-collector -config=config-develop.json -service=fillCheckProxiesQueue`
-- `./proxy-collector -config=config-develop.json -service=processCheckProxies`
+- `./proxy-collector -config=./config/develop-app.json -service=findProxySourcesFromDDG`
+- `./proxy-collector -config=./config/develop-app.json -service=processProxySources`
+- `./proxy-collector -config=./config/develop-app.json -service=transferDeferredProxySources`
+- `./proxy-collector -config=./config/develop-app.json -service=processRawProxies`
+- `./proxy-collector -config=./config/develop-app.json -service=fillCheckProxies`
+- `./proxy-collector -config=./config/develop-app.json -service=processCheckProxies`
 
 3. Show rabbitMQ management: http://localhost:15672 (login: `admin`, password: `admin`).
 

@@ -1,4 +1,4 @@
-## 0.3.1 - in progress
+## 0.3.1 - 2021.08.13
 
 - updated findProxySourcesFromDDG finish logger info
 - added test for convertBytesToStringSlice
@@ -6,6 +6,7 @@
 - added tests for sendGetRequest
 - added tests for findSiteURLsFromDDG
 - fix typo
+- readme updated
 
 ## 0.3.0 - 2021.08.12
 

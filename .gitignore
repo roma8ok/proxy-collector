@@ -1,4 +1,5 @@
 /.idea
 /temp
-/config-prod.json
-/proxy-collector
+/config/prod-app.json
+proxy-collector
+*.drawio
