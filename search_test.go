@@ -60,7 +60,7 @@ func TestFindSiteURLsFromDDG_Success(t *testing.T) {
 		"https://www.petrikainulainen.net/programming/spring-framework/spring-data-jpa-tutorial-creating-database-queries-with-the-query-annotation/",
 	}
 
-	got := findSiteURLsFromDDG([]byte(duckDuckGoSearchHTML))
+	got := findSiteURLsFromDDG([]byte(testDuckDuckGoSearchHTML))
 	if !reflect.DeepEqual(expected, got) {
 		t.Errorf(`findSiteURLsFromDDG(html) = %v, expected %v`, got, expected)
 	}
@@ -104,6 +104,34 @@ Not found, because they don't have a protocol:
 	got := findURLs([]byte(in))
 	if !reflect.DeepEqual(got, expected) {
 		t.Errorf(`findURLs(data) = %v, expected %v`, got, expected)
+	}
+}
+
+func TestFindProxiesHostPort_Empty(t *testing.T) {
+	empty := make([]byte, 0)
+	expected := make([]string, 0)
+	got := findProxiesHostPort(empty)
+	if !reflect.DeepEqual(got, expected) {
+		t.Errorf(`findProxiesHostPort(data) = %v, expected %v`, got, expected)
+	}
+}
+
+func TestFindProxiesHostPort_Success(t *testing.T) {
+	expected := []string{
+		"131.72.68.222:45005",
+		"45.121.216.219:55443",
+		"168.119.248.202:8080",
+		"195.154.84.106:5566",
+		"101.109.255.18:50538",
+		"194.88.158.17:31880",
+		"62.152.75.110:50287",
+		"159.224.166.129:38779",
+		"27.116.51.115:8080",
+		"33.116.51.115:8080",
+	}
+	got := findProxiesHostPort([]byte(testProxiesHostPortData))
+	if !reflect.DeepEqual(got, expected) {
+		t.Errorf(`findProxiesHostPort(data) = %v, expected %v`, got, expected)
 	}
 }
 
