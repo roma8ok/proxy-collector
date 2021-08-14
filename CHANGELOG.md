@@ -1,6 +1,7 @@
 ## 0.3.2 - in progress
 
 - changed the recommended number of workers
+- added tests for findURLs
 
 ## 0.3.1 - 2021.08.13
 

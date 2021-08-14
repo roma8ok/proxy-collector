@@ -45,6 +45,15 @@ func findSiteURLsFromDDG(html []byte) (urls []string) {
 	return set(urls)
 }
 
+// findURLs returns urls from input data.
+// findURLs searches URLs with protocol only (http or https).
+func findURLs(in []byte) []string {
+	re := regexp.MustCompile(`https?://(www\.)?[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_+.~#?&/=]*)`)
+	urls := re.FindAll(in, -1)
+
+	return set(convertBytesToStringSlice(urls))
+}
+
 // sendGetRequest send GET request through proxy and returns the response body and an error.
 // If proxyURL is equal empty string, proxy is not used.
 func sendGetRequest(logger Logger, toURL, proxyURL string, headers map[string]string) ([]byte, error) {
@@ -96,13 +105,6 @@ func sendGetRequest(logger Logger, toURL, proxyURL string, headers map[string]st
 	}
 
 	return body, nil
-}
-
-func findURLsFromHTML(html []byte) []string {
-	re := regexp.MustCompile(`https?://(www\.)?[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_+.~#?&/=]*)`)
-	urls := re.FindAll(html, -1)
-
-	return set(convertBytesToStringSlice(urls))
 }
 
 func findProxiesFromHTML(html []byte) []string {

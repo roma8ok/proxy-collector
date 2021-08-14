@@ -66,6 +66,47 @@ func TestFindSiteURLsFromDDG_Success(t *testing.T) {
 	}
 }
 
+func TestFindURLs_Empty(t *testing.T) {
+	empty := make([]byte, 0)
+	urls := findURLs(empty)
+	if len(urls) != 0 {
+		t.Errorf(`findURLs(%s) = %v, expected empty slice`, empty, urls)
+	}
+}
+
+func TestFindURLs_Success(t *testing.T) {
+	in := `
+Found:
+1. http://www.youtube.com
+2. https://www.facebook.com
+3. http://baidu.com
+4. https://yahoo.com
+5. http://www.amazon.com?query=123
+6. http://api.wikipedia.org/
+7. https://www.google.co.in
+
+Not found, because they don't have a protocol:
+1. qq.com
+2. twitter.com/123/
+3. live.com?query=123
+`
+
+	expected := []string{
+		"http://www.youtube.com",
+		"https://www.facebook.com",
+		"http://baidu.com",
+		"https://yahoo.com",
+		"http://www.amazon.com?query=123",
+		"http://api.wikipedia.org/",
+		"https://www.google.co.in",
+	}
+
+	got := findURLs([]byte(in))
+	if !reflect.DeepEqual(got, expected) {
+		t.Errorf(`findURLs(data) = %v, expected %v`, got, expected)
+	}
+}
+
 func TestSendGetRequest_Success(t *testing.T) {
 	const successBody = "OK"
 

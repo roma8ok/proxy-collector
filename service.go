@@ -99,7 +99,7 @@ func processProxySources(app App, queueSource, queueDestRawProxies, queueDestPro
 			}
 		}
 
-		urlsFromHTML := findURLsFromHTML(html)
+		urlsFromHTML := findURLs(html)
 		addedURLs := 0
 		if len(proxiesFromHTML) > 0 {
 			for _, urlFromHTML := range urlsFromHTML {
