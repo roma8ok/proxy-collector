@@ -2,6 +2,7 @@
 
 - added tests for findProxiesHostPort
 - added values to queriesForSearchEngine
+- added findProxySourcesFromDDG description
 
 ## 0.3.2 - 2021.08.14
 

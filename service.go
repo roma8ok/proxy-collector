@@ -7,6 +7,15 @@ import (
 	"github.com/pkg/errors"
 )
 
+/*
+findProxySourcesFromDDG sends proxy sources found in DuckDuckGo to the destination rabbitMQ queue.
+The "proxy source" is the url.
+
+The query is retrieved from queriesForSearchEngine or from recently checked proxies.
+
+findProxySourcesFromDDG only sends the proxy source to the destination queue if the proxy source is new or
+hasn't been checked for a long time. This is verified with redis.
+*/
 func findProxySourcesFromDDG(app App, queueDest *RabbitMQSession, fromProxies bool) error {
 	startTime := time.Now()
 
