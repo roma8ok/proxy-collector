@@ -34,15 +34,15 @@ Found proxies are [here](https://github.com/roma8ok/proxy-list).
 
 - In `ip_api_url` you can use `https://public-ip.dev/`, `https://api64.ipify.org/` or other similar services.
 
-3. Start services (the recommended number of workers in brackets).
+3. Start services (in brackets the recommended number of service workers per 1 IP).
 
 - `go build .`
-- `./proxy-collector -config=./config/prod-app.json -service=findProxySourcesFromDDG -workers=1` (only 1)
-- `./proxy-collector -config=./config/prod-app.json -service=processProxySources -workers=64` (>=64)
-- `./proxy-collector -config=./config/prod-app.json -service=transferDeferredProxySources -workers=1` (only 1)
-- `./proxy-collector -config=./config/prod-app.json -service=processRawProxies -workers=512` (>=512)
-- `./proxy-collector -config=./config/prod-app.json -service=fillCheckProxies -workers=1` (only 1)
-- `./proxy-collector -config=./config/prod-app.json -service=processCheckProxies -workers=64` (>=64)
+- `./proxy-collector -config=./config/prod-app.json -service=findProxySourcesFromDDG -workers=1` (only 1 worker)
+- `./proxy-collector -config=./config/prod-app.json -service=processProxySources -workers=64` (64 <= workers <= 512)
+- `./proxy-collector -config=./config/prod-app.json -service=transferDeferredProxySources -workers=1` (only 1 worker)
+- `./proxy-collector -config=./config/prod-app.json -service=processRawProxies -workers=512` (512 <= workers <= 1024)
+- `./proxy-collector -config=./config/prod-app.json -service=fillCheckProxies -workers=1` (only 1 worker)
+- `./proxy-collector -config=./config/prod-app.json -service=processCheckProxies -workers=64` (64 <= workers <= 1024)
 
 ## Local development
 

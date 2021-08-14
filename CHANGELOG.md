@@ -1,3 +1,7 @@
+## 0.3.2 - in progress
+
+- changed the recommended number of workers
+
 ## 0.3.1 - 2021.08.13
 
 - updated findProxySourcesFromDDG finish logger info
