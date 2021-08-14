@@ -26,8 +26,7 @@ func findProxySourcesFromDDG(app App, queueDest *RabbitMQSession, fromProxies bo
 	if len(proxies) > 0 {
 		query = randomElementFromSlice(proxies)
 	} else {
-		queries := []string{"proxy list", "proxy", "proxies", "прокси", "список прокси"}
-		query = randomElementFromSlice(queries)
+		query = randomElementFromSlice(queriesForSearchEngine)
 	}
 
 	searchURL := makeDDGSearchURL(query)

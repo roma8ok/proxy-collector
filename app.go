@@ -41,6 +41,14 @@ const (
 
 var (
 	errStatusCodeNotOK = errors.New("status code is not 200")
+
+	queriesForSearchEngine = []string{
+		"proxy list", "proxy lists", "proxy", "proxies", "best proxies", "free proxies",
+		"eine Liste von Proxies", "Proxys", "kostenlose Proxys", "offene Proxys",
+		"lista de proxy", "proxies abiertos", "proxies gratuitos",
+		"список прокси", "прокси", "лучшее прокси", "бесплатные прокси", "открытые прокси",
+		"代理名單", "代理列表", "免費代理",
+	}
 )
 
 // Config is app urls configuration
