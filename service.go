@@ -99,9 +99,11 @@ func processProxySources(app App, queueSource, queueDestRawProxies, queueDestPro
 			}
 		}
 
-		urlsFromHTML := findURLs(html)
+		foundURLs := 0
 		addedURLs := 0
 		if len(proxiesFromHTML) > 0 {
+			urlsFromHTML := findURLs(html)
+			foundURLs = len(urlsFromHTML)
 			for _, urlFromHTML := range urlsFromHTML {
 				if !urlsHaveSameDomain(proxySource, urlFromHTML) {
 					continue
@@ -127,7 +129,7 @@ func processProxySources(app App, queueSource, queueDestRawProxies, queueDestPro
 		}
 
 		app.loki.info(fmt.Sprintf(`Done in %s; found/added: %d/%d proxies, %d/%d urls; processed "%s"`,
-			formatDuration(time.Now().Sub(startTime)), len(proxiesFromHTML), addedProxies, len(urlsFromHTML), addedURLs, proxySource))
+			formatDuration(time.Now().Sub(startTime)), len(proxiesFromHTML), addedProxies, foundURLs, addedURLs, proxySource))
 
 		return true
 	}

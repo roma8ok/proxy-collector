@@ -1,7 +1,8 @@
-## 0.3.2 - in progress
+## 0.3.2 - 2021.08.14
 
 - changed the recommended number of workers
 - added tests for findURLs
+- processProxySources optimized
 
 ## 0.3.1 - 2021.08.13
 
