@@ -4,6 +4,7 @@
 - added values to queriesForSearchEngine
 - added findProxySourcesFromDDG description
 - increased requests timeout
+- added tests for cleanProxies
 
 ## 0.3.2 - 2021.08.14
 

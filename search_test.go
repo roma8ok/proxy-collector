@@ -107,6 +107,33 @@ Not found, because they don't have a protocol:
 	}
 }
 
+func TestCleanProxies_Empty(t *testing.T) {
+	in := make([]string, 0)
+	got := cleanProxies(in)
+	if len(got) != 0 {
+		t.Errorf(`cleanProxies(%v) = %v, expected %v`, in, got, in)
+	}
+}
+
+func TestCleanProxies_Success(t *testing.T) {
+	in := []string{
+		"100.100.100.100:8080",
+		"10.10.10.10:9000",
+		"01.1.1.100:10100",
+		"100.100.100.100:8080",
+	}
+	expected := []string{
+		"100.100.100.100:8080",
+		"10.10.10.10:9000",
+		"1.1.1.100:10100",
+	}
+
+	got := cleanProxies(in)
+	if !reflect.DeepEqual(expected, got) {
+		t.Errorf(`cleanProxies(%v) = %v, expected %v`, in, got, expected)
+	}
+}
+
 func TestFindProxiesHostPort_Empty(t *testing.T) {
 	empty := make([]byte, 0)
 	expected := make([]string, 0)

@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"strings"
 
 	"github.com/pkg/errors"
 )
@@ -59,7 +60,23 @@ func findProxiesFromHTML(html []byte) []string {
 	tableProxy := findProxiesFromTable(html)
 	proxies := append(wholeProxies, tableProxy...)
 
-	return set(proxies)
+	return cleanProxies(proxies)
+}
+
+// cleanProxies expects to get a slice of proxies. Input validation does not occur.
+// cleanProxies removes duplicates and removes the "0" prefix.
+func cleanProxies(in []string) []string {
+	length := len(in)
+	if length == 0 {
+		return make([]string, 0)
+	}
+
+	out := make([]string, length)
+	for idx, p := range in {
+		out[idx] = strings.TrimPrefix(p, "0")
+	}
+
+	return set(out)
 }
 
 // findProxiesHostPort returns proxies from input data.
