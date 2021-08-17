@@ -1,10 +1,11 @@
-## 0.3.3 - in progress
+## 0.3.3 - 2021.08.18
 
 - added tests for findProxiesHostPort
 - added values to queriesForSearchEngine
 - added findProxySourcesFromDDG description
 - increased requests timeout
 - added tests for cleanProxies
+- added tests for SQLBuilder
 
 ## 0.3.2 - 2021.08.14
 

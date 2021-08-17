@@ -15,6 +15,9 @@ const (
 
 	requestTimeout = 10 * time.Second
 
+	// Database table names:
+	tableProxies = "proxies"
+
 	// RabbitMQ queue names:
 	queueProxySources         = "proxy_sources"
 	queueProxySourcesDeferred = "proxy_sources_deferred"
@@ -40,7 +43,8 @@ const (
 )
 
 var (
-	errStatusCodeNotOK = errors.New("status code is not 200")
+	errStatusCodeNotOK   = errors.New("status code is not 200")
+	errDBInsertEmptyData = errors.New("can't insert to db empty data")
 
 	queriesForSearchEngine = []string{
 		"proxy list", "proxy lists", "proxy", "proxies", "best proxies", "free proxies",

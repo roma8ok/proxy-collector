@@ -175,12 +175,14 @@ func processRawProxies(app App, queueSource *RabbitMQSession) {
 		p.Created = startTime
 		p.LastCheck = startTime
 
-		if err := saveProxyToDB(app.postgresPool, p); err != nil {
+		successType, err := saveProxyToDB(app.postgresPool, p)
+		if err != nil {
 			app.loki.error(errors.WithStack(err))
 			return false
 		}
 
-		app.loki.info(fmt.Sprintf(`Done in %s; added "%s"`, formatDuration(time.Now().Sub(startTime)), pURL))
+		app.loki.info(fmt.Sprintf(`Done in %s; %s "%s"`,
+			formatDuration(time.Now().Sub(startTime)), successType, pURL))
 		return true
 	}
 
